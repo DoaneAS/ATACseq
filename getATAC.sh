@@ -7,7 +7,7 @@
 #$ -l os=rhel6.3
 #$ -M ashley.doane@gmail.com
 #$ -l h_rt=40:50:00
-#$ -pe smp 4-8
+#$ -pe smp 12-16
 #$ -l h_vmem=12G
 #$ -R y
 
@@ -309,7 +309,7 @@ echo "------------------------------------------Call Peaks with MACS2-----------
 
 macs2 callpeak -t $TMPDIR/${Sample}/${Sample}.tn5.tagAlign.gz -f BED -n $TMPDIR/${Sample}/${Sample}.narrow -g hs --nomodel --shift -75 --extsize 150 --keep-dup all --call-summits -p 1e-2
 
-macs2 callpeak -t $TMPDIR/${Sample}/${Sample}.tn5.tagAlign.gz -f BED -n $TMPDIR/${Sample}/${Sample}.broad -g hs  --nomodel --shift -100 --extsize 200 --keep-dup all --broad --broad-cutoff 0.1
+macs2 callpeak -t $TMPDIR/${Sample}/${Sample}.tn5.tagAlign.gz -f BED -n $TMPDIR/${Sample}/${Sample}.broad -g hs  --nomodel --shift -75 --extsize 150 --keep-dup all --broad --broad-cutoff 0.1
 
 #macs2 callpeak -t $TMPDIR/${Sample}/${Sample}.sorted.nodup.noM.black.bam -f BAMPE -n $TMPDIR/${Sample}/${Sample}.narrow -g hs --nomodel --shift -75 --extsize 150 --keep-dup all --call-summits -p 1e-3
 
@@ -364,7 +364,7 @@ rsync -r -a -v $TMPDIR/${Sample} $path/${Sample}
 
 echo "------------------------------------------Call Nucleosomes with NucleoATAC------------------------------"
 #
- bedtools slop -i $TMPDIR/${Sample}/${Sample}.broad_peaks.broadPeak -g chrom.sizes -b 1000 > $TMPDIR/${Sample}/${Sample}.slop1k.bed
+ bedtools slop -i $TMPDIR/${Sample}/${Sample}.broad.broadPeak -g ${chrsz} -b 1000 > $TMPDIR/${Sample}/${Sample}.slop1k.bed
 
  ## save to run on pooled samples
  ## high resolution 1bp bin insertion density
@@ -372,9 +372,9 @@ echo "------------------------------------------Call Nucleosomes with NucleoATAC
 
 
 #
-#rsync -avP /home/asd2007/dat02/asd2007/Reference/Homo_sapiens/UCSC/hg19/Sequence/WholeGenomeFasta/genome.* ./
-#nucleoatac run --bed $TMPDIR/${Sample}/${Sample}.slop1k.bed --bam $TMPDIR/${Sample}/${Sample}.sorted.nodup.noM.black.bam --fasta $TMPDIR/genome.fa --out  $TMPDIR/${Sample}/${Sample} \
-#    --write_all --cores ${NSLOTS}
+rsync -avP /home/asd2007/dat02/asd2007/Reference/Homo_sapiens/UCSC/hg19/Sequence/WholeGenomeFasta/genome.* ./
+nucleoatac run --bed $TMPDIR/${Sample}/${Sample}.slop1k.bed --bam $TMPDIR/${Sample}/${Sample}.sorted.nodup.noM.black.bam --fasta $TMPDIR/genome.fa --out  $TMPDIR/${Sample}/${Sample} \
+    --write_all --cores ${NSLOTS}
 #
 rsync -avP $TMPDIR/${Sample} $path/${Sample}
 rsync -r -a -v $TMPDIR/${Sample} $path/${Sample}
@@ -393,14 +393,14 @@ rsync -r -a -v $TMPDIR/${Sample} $path/${Sample}
 #~/SHELL_SCRIPTS/bdg2bw $TMPDIR/${Sample}/${Sample}.ins.smooth.ins.bdg chrom.sizes
 
 
-#mv $TMPDIR/${Sample}/${Sample}.nucleoatac_signal.smooth.bedgraph.gz $TMPDIR/${Sample}/${Sample}.nucleoatac_signal.smooth.bdg.gz
+mv $TMPDIR/${Sample}/${Sample}.nucleoatac_signal.smooth.bedgraph.gz $TMPDIR/${Sample}/${Sample}.nucleoatac_signal.smooth.bdg.gz
 
-#gunzip $TMPDIR/${Sample}/${Sample}.nucleoatac_signal.smooth.bdg.gz
-#~/SHELL_SCRIPTS/bdg2bw  $TMPDIR/${Sample}/${Sample}.nucleoatac_signal.smooth.bdg chrom.sizes
+gunzip $TMPDIR/${Sample}/${Sample}.nucleoatac_signal.smooth.bdg.gz
+~/SHELL_SCRIPTS/bdg2bw  $TMPDIR/${Sample}/${Sample}.nucleoatac_signal.smooth.bdg chrom.sizes
 
 
 #rm $TMPDIR/${Sample}/${Sample}*.bdg
 
 ###
-#rsync -avP $TMPDIR/${Sample} $path/${Sample}
-#rsync -r -a -v $TMPDIR/${Sample} $path/${Sample}
+rsync -avP $TMPDIR/${Sample} $path/${Sample}
+rsync -r -a -v $TMPDIR/${Sample} $path/${Sample}

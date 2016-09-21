@@ -1,5 +1,5 @@
 #!/bin/bash -l
-#$ -N Atac-debug
+#$ -N AtacSEQ
 #$ -j y
 #$ -m a
 #$ -cwd
@@ -15,6 +15,7 @@
 path=$1 #path to all the Samples
 gtf_path=$2 #Number indicating the reference gtf [1 for Human 2 for Mouse 3 for other]
 
+echo "requirements: deeptools, python 2.7, macs2, picard, java, sambamba, bwa, ucsc-tools"
 
 # Uses job array for each Sample in the folder
 file=$(ls ${path} | tail -n +${SGE_TASK_ID}| head -1)
@@ -56,7 +57,7 @@ echo "Processing  $Sample ..."
 
 if [ $gtf_path == 1 ]
 then
-	gtf="/zenodotus/dat02/elemento_lab_scratch/oelab_scratch_scratch007/akv3001/mm10_UCSC_ref.gtf"
+	#gtf="/zenodotus/dat02/elemento_lab_scratch/oelab_scratch_scratch007/akv3001/mm10_UCSC_ref.gtf"
 	REF="/zenodotus/dat02/elemento_lab_scratch/oelab_scratch_scratch007/akv3001/Genomes/Homo_sapiens/UCSC/hg19/Sequence/BWAIndex"
 	REFbt2="/zenodotus/dat02/elemento_lab_scratch/oelab_scratch_scratch007/akv3001/Genomes/Homo_sapiens/UCSC/hg19/Sequence/Bowtie2Index"
    # REFbt="/home/asd20i07/dat02/asd2007/Reference/Homo_sapiens/UCSC/mm10/Sequence/BowtieIndex/genome"
@@ -102,8 +103,8 @@ mv *_1* R1/
 mv *_2* R2/
 
 
-mv *val_1* R1/
-mv *val_2* R2/
+#mv *val_1* R1/
+#mv *val_2* R2/
 #mv *_1.fastq R1/
 #mv *_2.fastq R2/
 

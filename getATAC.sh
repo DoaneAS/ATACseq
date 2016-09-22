@@ -259,8 +259,8 @@ picardmetrics run -o $TMPDIR/metrics $TMPDIR/${Sample}/${Sample}.sorted.nodup.no
 
 #picardmetrics run -o $TMPDIR/metrics $TMPDIR/${Sample}/${Sample}.sorted.nodup.noM.bam
 
-mkdir /zenodotus/dat01/melnick_bcell_scratch/asd2007/atacData/QCmetrics/${Sample}
-rsync -r -v $TMPDIR/metrics /zenodotus/dat01/melnick_bcell_scratch/asd2007/atacData/QCmetrics/${Sample}/
+#mkdir /zenodotus/dat01/melnick_bcell_scratch/asd2007/atacData/QCmetrics/${Sample}
+rsync -r -v $TMPDIR/metrics $path/${Sample}
 
 # histogram file
 for w in 1000 500 200

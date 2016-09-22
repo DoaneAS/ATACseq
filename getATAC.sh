@@ -7,7 +7,7 @@
 #$ -l os=rhel6.3
 #$ -M ashley.doane@gmail.com
 #$ -l h_rt=40:50:00
-#$ -pe smp 12-16
+#$ -pe smp 8
 #$ -l h_vmem=12G
 #$ -R y
 
@@ -91,7 +91,7 @@ rsync -avP ${REFbt2} $TMPDIR/
 
 mkdir R1
 mkdir R2
-mkdir ${Sample}
+mkdir ${TMPDIR}/${Sample}
 
 gunzip *.gz
 
@@ -372,12 +372,12 @@ echo "------------------------------------------Call Nucleosomes with NucleoATAC
 
 
 #
-rsync -avP /home/asd2007/dat02/asd2007/Reference/Homo_sapiens/UCSC/hg19/Sequence/WholeGenomeFasta/genome.* ./
-nucleoatac run --bed $TMPDIR/${Sample}/${Sample}.slop1k.bed --bam $TMPDIR/${Sample}/${Sample}.sorted.nodup.noM.black.bam --fasta $TMPDIR/genome.fa --out  $TMPDIR/${Sample}/${Sample} \
-    --write_all --cores ${NSLOTS}
+#rsync -avP /home/asd2007/dat02/asd2007/Reference/Homo_sapiens/UCSC/hg19/Sequence/WholeGenomeFasta/genome.* ./
+#nucleoatac run --bed $TMPDIR/${Sample}/${Sample}.slop1k.bed --bam $TMPDIR/${Sample}/${Sample}.sorted.nodup.noM.black.bam --fasta $TMPDIR/genome.fa --out  $TMPDIR/${Sample}/${Sample} \
+#    --write_all --cores ${NSLOTS}
 #
-rsync -avP $TMPDIR/${Sample} $path/${Sample}
-rsync -r -a -v $TMPDIR/${Sample} $path/${Sample}
+#rsync -avP $TMPDIR/${Sample} $path/${Sample}
+#rsync -r -a -v $TMPDIR/${Sample} $path/${Sample}
 #
 
 ## additional tracks
@@ -393,14 +393,14 @@ rsync -r -a -v $TMPDIR/${Sample} $path/${Sample}
 #~/SHELL_SCRIPTS/bdg2bw $TMPDIR/${Sample}/${Sample}.ins.smooth.ins.bdg chrom.sizes
 
 
-mv $TMPDIR/${Sample}/${Sample}.nucleoatac_signal.smooth.bedgraph.gz $TMPDIR/${Sample}/${Sample}.nucleoatac_signal.smooth.bdg.gz
+#mv $TMPDIR/${Sample}/${Sample}.nucleoatac_signal.smooth.bedgraph.gz $TMPDIR/${Sample}/${Sample}.nucleoatac_signal.smooth.bdg.gz
 
-gunzip $TMPDIR/${Sample}/${Sample}.nucleoatac_signal.smooth.bdg.gz
-~/SHELL_SCRIPTS/bdg2bw  $TMPDIR/${Sample}/${Sample}.nucleoatac_signal.smooth.bdg chrom.sizes
+#gunzip $TMPDIR/${Sample}/${Sample}.nucleoatac_signal.smooth.bdg.gz
+#~/SHELL_SCRIPTS/bdg2bw  $TMPDIR/${Sample}/${Sample}.nucleoatac_signal.smooth.bdg chrom.sizes
 
 
 #rm $TMPDIR/${Sample}/${Sample}*.bdg
 
 ###
-rsync -avP $TMPDIR/${Sample} $path/${Sample}
-rsync -r -a -v $TMPDIR/${Sample} $path/${Sample}
+#rsync -avP $TMPDIR/${Sample} $path/${Sample}
+#rsync -r -a -v $TMPDIR/${Sample} $path/${Sample}

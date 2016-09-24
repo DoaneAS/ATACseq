@@ -1,5 +1,5 @@
 #!/bin/bash -l
-#$ -N AtacSEQ
+#$ -N AtacAdapt
 #$ -j y
 #$ -m a
 #$ -cwd
@@ -7,9 +7,14 @@
 #$ -l os=rhel6.3
 #$ -M ashley.doane@gmail.com
 #$ -l h_rt=40:50:00
-#$ -pe smp 8
+#$ -pe smp 8-12
 #$ -l h_vmem=12G
 #$ -R y
+
+########### SETTINGS ###########
+TRIM=0
+NUC=1
+##############################
 
 
 path=$1 #path to all the Samples
@@ -125,8 +130,17 @@ cat $TMPDIR/R1/*.*q > $TMPDIR/R1/${Sample}.R1.fastq
 cat $TMPDIR/R2/*.*q > $TMPDIR/R2/${Sample}.R2.fastq
 
 
-cutadapt -m 5 -e 0.20 -a CTGTCTCTTATA -A CTGTCTCTTATA -o $TMPDIR/R1/${Sample}.R1.fq -p $TMPDIR/R2/${Sample}.R2.fq $TMPDIR/R1/${Sample}.R1.fastq $TMPDIR/R2/${Sample}.R2.fastq
-
+if [$TRIM == 1]
+then
+    echo "Trimming adapter sequences, with command..."
+    echo "cutadapt command: cutadapt -m 5 -e 0.2 -a CTGTCTCTTATA -A CTGTCTCTTATA -o $TMPDIR/R1/${Sample}.R1.fq -p $TMPDIR/R2/${Sample}.R2.fq $TMPDIR/R1/${Sample}.R1.fastq $TMPDIR/R2/${Sample}.R2.fastq"
+    cutadapt -m 5 -e 0.2 -a CTGTCTCTTATA -A CTGTCTCTTATA -o $TMPDIR/R1/${Sample}.R1.fq -p $TMPDIR/R2/${Sample}.R2.fq $TMPDIR/R1/${Sample}.R1.fastq $TMPDIR/R2/${Sample}.R2.fastq;
+    echo "completed trimming"
+else
+    echo "will not perform adapter sequence trimming of reads"
+    mv $TMPDIR/R2/${Sample}.R2.fastq $TMPDIR/R2/${Sample}.R2.fq
+    mv $TMPDIR/R1/${Sample}.R1.fastq $TMPDIR/R1/${Sample}.R1.fq
+fi
 
 #bowtie2  -X 2000 -p ${NSLOTS} -x $TMPDIR/Bowtie2Index/genome -1 $TMPDIR/R1/${Sample}.R1.fq -2 $TMPDIR/R2/${Sample}.R2.fq -S $TMPDIR/${Sample}/${Sample}.bt2.sam
 
@@ -193,9 +207,9 @@ samtools view -F 1804 -f 2 -u  ${TMP_FILT_BAM_FILE}.fixmate.bam | sambamba sort 
 
 echo "----------------------Remove duplicates--------------------"
 #Remove duplicates using picard
-#need to fix/rebuild picard
 #java -Xmx8g -jar /home/ole2001/PROGRAMS/SOFT/picard-tools-1.71/MarkDuplicates.jar REMOVE_DUPLICATES=true INPUT=$TMPDIR/${Sample}/${Sample}.sorted.bam METRICS_FILE=$TMPDIR/${Sample}/dedup.txt OUTPUT=$TMPDIR/${Sample}/${Sample}.sorted.nodup.bam VALIDATION_STRINGENCY=LENIENT ASSUME_SORTED=True
 
+## CAN ALSO USE A  CONDA Built PICARD and call like:  picard MarkDuplicates INPUT.... ##
 
 
 java -Xmx8g -jar /home/akv3001/Programs/picard/dist/picard.jar MarkDuplicates INPUT=${FILT_BAM_FILE} METRICS_FILE=$TMPDIR/${Sample}/dedup.txt \
@@ -220,10 +234,10 @@ mkdir metrics
 #picardmetrics run -o $TMPDIR/metrics $TMPDIR/${Sample}/${Sample}.sorted.bam
 
 
-pbc_qc="$TMPDIR/${Sample}/${Sample}.library_complexity.qc.txt"
+pbc_qc=$TMPDIR/${Sample}/${Sample}.library_complexity.qc.txt
 
 
-dupmark_bam=$TMPDIR/${Sample}.sorted.uniq.nodup.bam
+dupmark_bam=$TMPDIR/${Sample}/${Sample}.sorted.uniq.nodup.bam
 
 ## TotalReadPairs [tab] DistinctReadPairs [tab] OneReadPair [tab] TwoReadPairs [tab] NRF=Distinct/Total [tab] PBC1=OnePair/Distinct [tab] PBC2=OnePair/TwoPair
 sambamba sort -t ${NSLOTS} -n  $TMPDIR/${Sample}/${Sample}.sorted.nodup.bam -o $TMPDIR/${Sample}/${Sample}.nsorted.nodup.bam
@@ -362,45 +376,35 @@ bamCoverage --bam $TMPDIR/${Sample}/${Sample}.sorted.nodup.noM.black.bam --binSi
 rsync -avP $TMPDIR/${Sample} $path/${Sample}
 rsync -r -a -v $TMPDIR/${Sample} $path/${Sample}
 
-echo "------------------------------------------Call Nucleosomes with NucleoATAC------------------------------"
-#
- bedtools slop -i $TMPDIR/${Sample}/${Sample}.broad.broadPeak -g ${chrsz} -b 1000 > $TMPDIR/${Sample}/${Sample}.slop1k.bed
 
+if [NUC == 1 ]
+then
+    echo "------------------------------------------Call Nucleosomes with NucleoATAC------------------------------"
+    bedtools slop -i $TMPDIR/${Sample}/${Sample}.broad.broadPeak -g ${chrsz} -b 1000 > $TMPDIR/${Sample}/${Sample}.slop1k.bed
  ## save to run on pooled samples
  ## high resolution 1bp bin insertion density
- #pyatac ins --bam $TMPDIR/${Sample}/${Sample}.sorted.nodup.noM.black.bam --out $TMPDIR/${Sample}/${Sample}.ins.smooth --smooth 151 --cores ${NSLOTS}
-
+    pyatac ins --bam $TMPDIR/${Sample}/${Sample}.sorted.nodup.noM.black.bam --out $TMPDIR/${Sample}/${Sample}.ins.smooth --smooth 151 --cores ${NSLOTS}
 
 #
-#rsync -avP /home/asd2007/dat02/asd2007/Reference/Homo_sapiens/UCSC/hg19/Sequence/WholeGenomeFasta/genome.* ./
-#nucleoatac run --bed $TMPDIR/${Sample}/${Sample}.slop1k.bed --bam $TMPDIR/${Sample}/${Sample}.sorted.nodup.noM.black.bam --fasta $TMPDIR/genome.fa --out  $TMPDIR/${Sample}/${Sample} \
-#    --write_all --cores ${NSLOTS}
-#
-#rsync -avP $TMPDIR/${Sample} $path/${Sample}
-#rsync -r -a -v $TMPDIR/${Sample} $path/${Sample}
-#
+    rsync -avP /home/asd2007/dat02/asd2007/Reference/Homo_sapiens/UCSC/hg19/Sequence/WholeGenomeFasta/genome.* ./
+    nucleoatac run --bed $TMPDIR/${Sample}/${Sample}.slop1k.bed --bam $TMPDIR/${Sample}/${Sample}.sorted.nodup.noM.black.bam --fasta $TMPDIR/genome.fa --out  $TMPDIR/${Sample}/${Sample} \
+        --write_all --cores ${NSLOTS}
+    #
+    rsync -avP $TMPDIR/${Sample} $path/${Sample}
+    #rsync -r -a -v $TMPDIR/${Sample} $path/${Sample}#
+    ## additional tracks
+    #igvtools toTDF -z 10 $TMPDIR/${Sample}/${Sample}.ins.smooth.ins.bedgraph.gz $TMPDIR/${Sample}/${Sample}.ins.smooth.ins.tdf $RG
+    mv $TMPDIR/${Sample}/${Sample}.ins.smooth.ins.bedgraph.gz $TMPDIR/${Sample}/${Sample}.ins.smooth.ins.bdg.gz
+    #gunzip $TMPDIR/${Sample}/${Sample}.ins.smooth.ins.bdg.gz
+    ~/SHELL_SCRIPTS/bdg2bw $TMPDIR/${Sample}/${Sample}.ins.smooth.ins.bdg $chrsz
+    mv $TMPDIR/${Sample}/${Sample}.nucleoatac_signal.smooth.bedgraph.gz $TMPDIR/${Sample}/${Sample}.nucleoatac_signal.smooth.bdg.gz
+    gunzip $TMPDIR/${Sample}/${Sample}.nucleoatac_signal.smooth.bdg.gz
+    ~/SHELL_SCRIPTS/bdg2bw  $TMPDIR/${Sample}/${Sample}.nucleoatac_signal.smooth.bdg $chrsz
+    #rm $TMPDIR/${Sample}/${Sample}*.bdg
+    ###
+    rsync -avP $TMPDIR/${Sample} $path/${Sample}
+    rsync -r -a -v $TMPDIR/${Sample} $path/${Sample}
+else
+    echo "---- no NucleoATAC------------------------------"
+fi
 
-## additional tracks
-
-
-#igvtools toTDF -z 10 $TMPDIR/${Sample}/${Sample}.ins.smooth.ins.bedgraph.gz $TMPDIR/${Sample}/${Sample}.ins.smooth.ins.tdf $RG
-
-
-#mv $TMPDIR/${Sample}/${Sample}.ins.smooth.ins.bedgraph.gz $TMPDIR/${Sample}/${Sample}.ins.smooth.ins.bdg.gz
-#gunzip $TMPDIR/${Sample}/${Sample}.ins.smooth.ins.bdg.gz
-
-
-#~/SHELL_SCRIPTS/bdg2bw $TMPDIR/${Sample}/${Sample}.ins.smooth.ins.bdg chrom.sizes
-
-
-#mv $TMPDIR/${Sample}/${Sample}.nucleoatac_signal.smooth.bedgraph.gz $TMPDIR/${Sample}/${Sample}.nucleoatac_signal.smooth.bdg.gz
-
-#gunzip $TMPDIR/${Sample}/${Sample}.nucleoatac_signal.smooth.bdg.gz
-#~/SHELL_SCRIPTS/bdg2bw  $TMPDIR/${Sample}/${Sample}.nucleoatac_signal.smooth.bdg chrom.sizes
-
-
-#rm $TMPDIR/${Sample}/${Sample}*.bdg
-
-###
-#rsync -avP $TMPDIR/${Sample} $path/${Sample}
-#rsync -r -a -v $TMPDIR/${Sample} $path/${Sample}

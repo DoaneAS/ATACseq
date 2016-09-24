@@ -144,10 +144,14 @@ fi
 
 #bowtie2  -X 2000 -p ${NSLOTS} -x $TMPDIR/Bowtie2Index/genome -1 $TMPDIR/R1/${Sample}.R1.fq -2 $TMPDIR/R2/${Sample}.R2.fq -S $TMPDIR/${Sample}/${Sample}.bt2.sam
 
+bowtie2 -k 4 -X2000 --mm --threads ${NSLOTS} -x $bwt2_idx \
+    -1 $TMPDIR/R1/${Sample}.R1.fq -2 $TMPDIR/R2/${Sample}.R2.fq 2> $TMPDIR/$Sample/${Sample}.bt2.log | \
+                    samtools view -bS - > $TMPDIR/${Sample}/${Sample}.bam | \
+                    samtools sort  - -o $TMPDIR/${Sample}/${Sample}.sorted.bam
 
-echo "aligning : $TMPDIR/R1/${Sample}.R1.fq ,  $TMPDIR/R2/${Sample}.R2.fq using bwa-mem.."
+#echo "aligning : $TMPDIR/R1/${Sample}.R1.fq ,  $TMPDIR/R2/${Sample}.R2.fq using bwa-mem.."
 
-bwa mem -t ${NSLOTS} -M $TMPDIR/BWAIndex/genome.fa $TMPDIR/R1/${Sample}.R1.fq $TMPDIR/R2/${Sample}.R2.fq > $TMPDIR/${Sample}/${Sample}.sam
+#bwa mem -t ${NSLOTS} -M $TMPDIR/BWAIndex/genome.fa $TMPDIR/R1/${Sample}.R1.fq $TMPDIR/R2/${Sample}.R2.fq > $TMPDIR/${Sample}/${Sample}.sam
 
 
 
@@ -156,7 +160,7 @@ echo "----------Samtools Converting to Sorted bam-----------------"
 
 #samtools view -bS $TMPDIR/${Sample}/${Sample}.sam| samtools sort  - $TMPDIR/${Sample}/${Sample}.sorted
 
-samtools view -bS $TMPDIR/${Sample}/${Sample}.sam | samtools sort  - -o $TMPDIR/${Sample}/${Sample}.sorted.bam
+#samtools view -bS $TMPDIR/${Sample}/${Sample}.sam | samtools sort  - -o $TMPDIR/${Sample}/${Sample}.sorted.bam
 
 #TMPDIR/${Sample}/${Sample}.bt2.sam
 

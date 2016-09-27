@@ -14,7 +14,7 @@
 ########### SETTINGS ###########
 TRIM=0
 NUC=0
-BT2ALN=0
+BT2ALN=1
 ##############################
 
 
@@ -108,11 +108,18 @@ cat *_R2* >  ${Sample}.R2.fastq.gz
 
 pyadapter_trim.py -a ${Sample}.R1.fastq.gz -b ${Sample}.R2.fastq.gz
 
+
+
+ls -lrth
+
+
 #gunzip *.gz
 
 
-cat  *_R1*trim* > $TMPDIR/R1/${Sample}.R1.fastq
-cat  *_R2*trim* > $TMPDIR/R2/${Sample}.R2.fastq
+
+
+cat  *R1*trim* > $TMPDIR/R1/${Sample}.R1.fastq
+cat  *R2*trim* > $TMPDIR/R2/${Sample}.R2.fastq
 
 #mv *_1* R1/
 #mv *_2* R2/

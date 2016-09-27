@@ -7,14 +7,14 @@
 #$ -l os=rhel6.3
 #$ -M ashley.doane@gmail.com
 #$ -l h_rt=40:50:00
-#$ -pe smp 4-12
+#$ -pe smp 4-8
 #$ -l h_vmem=12G
 #$ -R y
 
 ########### SETTINGS ###########
-TRIM=1
+TRIM=0
 NUC=0
-BT2ALN=1
+BT2ALN=0
 ##############################
 
 
@@ -97,16 +97,25 @@ rsync -avP ${REFbt2} $TMPDIR/
 
 mkdir R1
 mkdir R2
-mkdir ${tmpdir}/${sample}
-
-gunzip *.gz
+mkdir ${TMPDIR}/${Sample}
 
 
-mv *_R1* R1/
-mv *_R2* R2/
 
-mv *_1* R1/
-mv *_2* R2/
+
+cat *_R1*  > ${Sample}.R1.fastq.gz
+cat *_R2* >  ${Sample}.R2.fastq.gz
+
+
+pyadapter_trim.py -a ${Sample}.R1.fastq.gz -b ${Sample}.R2.fastq.gz
+
+#gunzip *.gz
+
+
+cat  *_R1*trim* > $TMPDIR/R1/${Sample}.R1.fastq
+cat  *_R2*trim* > $TMPDIR/R2/${Sample}.R2.fastq
+
+#mv *_1* R1/
+#mv *_2* R2/
 
 
 #mv *val_1* R1/
@@ -126,8 +135,8 @@ echo "aligning : $F1 , $F2 using bwa-mem.."
 
 #gunzip -c $TMPDIR/R1/$F1 > $TMPDIR/R1/${Sample}.R1.fastq
 #gunzip -c $TMPDIR/R2/$F2 > $TMPDIR/R2/${Sample}.R2.fastq
-cat $TMPDIR/R1/*.*q > $TMPDIR/R1/${Sample}.R1.fastq
-cat $TMPDIR/R2/*.*q > $TMPDIR/R2/${Sample}.R2.fastq
+#cat $TMPDIR/R1/*.*q > $TMPDIR/R1/${Sample}.R1.fastq
+#cat $TMPDIR/R2/*.*q > $TMPDIR/R2/${Sample}.R2.fastq
 
 
 if [ $TRIM == 1 ]
@@ -140,8 +149,8 @@ then
    echo "completed trimming"
 else
     echo "will not perform adapter sequence trimming of reads"
-    mv $TMPDIR/R2/${Sample}.R2.fastq $TMPDIR/R2/${Sample}.R2.trim.fastq
-    mv $TMPDIR/R1/${Sample}.R1.fastq $TMPDIR/R1/${Sample}.R1.trim.fastq
+ #   mv $TMPDIR/R2/${Sample}.R2.fastq $TMPDIR/R2/${Sample}.R2.trim.fastq
+ #   mv $TMPDIR/R1/${Sample}.R1.fastq $TMPDIR/R1/${Sample}.R1.trim.fastq
 fi
 
 
@@ -153,18 +162,18 @@ if [ $BT2ALN == 1 ]
 then
     echo "----------bowtie2 aligning-------------"
     bowtie2 -k 4 -X2000 --mm --threads ${NSLOTS} -x $TMPDIR/Bowtie2Index/genome  \
-        -1 $TMPDIR/R1/${Sample}.R1.trim.fq -2 $TMPDIR/R2/${Sample}.R2.trim.fq  | samtools view -bS - > $TMPDIR/${Sample}.bam
+        -1 $TMPDIR/R1/${Sample}.R1.trim.fastq -2 $TMPDIR/R2/${Sample}.R2.trim.fastq  | samtools view -bS - > $TMPDIR/${Sample}.bam
    # samtools sort  $TMPDIR/${Sample}.bam -o $TMPDIR/${Sample}/${Sample}.sorted.bam
     #cp $TMPDIR/${Sample}/${Sample}.sorted.bam  $TMPDIR/${Sample}/${Sample}.bt2.sorted.bam
 else
     echo "----------bwa-mem aligning-------------"
     echo "aligning : $TMPDIR/R1/${Sample}.R1.trim.fq ,  $TMPDIR/R2/${Sample}.R2.trim.fq using bwa-mem.."
-    bwa mem -t ${NSLOTS} -M $TMPDIR/BWAIndex/genome.fa $TMPDIR/R1/${Sample}.R1.fq $TMPDIR/R2/${Sample}.R2.fq | samtools view -bS - >  $TMPDIR/${Sample}.bam
+    bwa mem -t ${NSLOTS} -M $TMPDIR/BWAIndex/genome.fa $TMPDIR/R1/${Sample}.R1.trim.fastq $TMPDIR/R2/${Sample}.R2.trim.fastq | samtools view -bS - >  $TMPDIR/${Sample}.bam
 fi
 
 echo "----------Samtools Converting to Sorted bam-----------------"
-samtools sort  $TMPDIR/${Sample}.bam -o $TMPDIR/${Sample}/${Sample}.sorted.bam
 
+samtools sort -n  $TMPDIR/${Sample}.bam -o $TMPDIR/${Sample}/${Sample}.sorted.bam
 
 echo "get insert Sizes of unfiltered alignments"
 

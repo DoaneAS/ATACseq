@@ -133,13 +133,15 @@ cat $TMPDIR/R2/*.*q > $TMPDIR/R2/${Sample}.R2.fastq
 if [ $TRIM == 1 ]
 then
     echo "Trimming adapter sequences, with command..."
-    echo "cutadapt command: cutadapt -m 5 -e 0.2 -a CTGTCTCTTATA -A CTGTCTCTTATA -o $TMPDIR/R1/${Sample}.R1.fq -p $TMPDIR/R2/${Sample}.R2.fq $TMPDIR/R1/${Sample}.R1.fastq $TMPDIR/R2/${Sample}.R2.fastq"
-    cutadapt -m 5 -e 0.2 -a CTGTCTCTTATA -A CTGTCTCTTATA -o $TMPDIR/R1/${Sample}.R1.fq -p $TMPDIR/R2/${Sample}.R2.fq $TMPDIR/R1/${Sample}.R1.fastq $TMPDIR/R2/${Sample}.R2.fastq;
-    echo "completed trimming"
+  #  echo "cutadapt command: cutadapt -m 5 -e 0.2 -a CTGTCTCTTATA -A CTGTCTCTTATA -o $TMPDIR/R1/${Sample}.R1.fq -p $TMPDIR/R2/${Sample}.R2.fq $TMPDIR/R1/${Sample}.R1.fastq $TMPDIR/R2/${Sample}.R2.fastq"
+   # cutadapt -m 5 -e 0.2 -a CTGTCTCTTATA -A CTGTCTCTTATA -o $TMPDIR/R1/${Sample}.R1.fq -p $TMPDIR/R2/${Sample}.R2.fq $TMPDIR/R1/${Sample}.R1.fastq $TMPDIR/R2/${Sample}.R2.fastq;
+   echo "pyadapter_trim.py"
+   pyadapter_trim.py -a $TMPDIR/R1/${Sample}.R1.fastq -b $TMPDIR/R2/${Sample}.R2.fastq
+   echo "completed trimming"
 else
     echo "will not perform adapter sequence trimming of reads"
-    mv $TMPDIR/R2/${Sample}.R2.fastq $TMPDIR/R2/${Sample}.R2.fq
-    mv $TMPDIR/R1/${Sample}.R1.fastq $TMPDIR/R1/${Sample}.R1.fq
+    mv $TMPDIR/R2/${Sample}.R2.fastq $TMPDIR/R2/${Sample}.R2.trim.fastq
+    mv $TMPDIR/R1/${Sample}.R1.fastq $TMPDIR/R1/${Sample}.R1.trim.fastq
 fi
 
 
@@ -151,12 +153,12 @@ if [ $BT2ALN == 1 ]
 then
     echo "----------bowtie2 aligning-------------"
     bowtie2 -k 4 -X2000 --mm --threads ${NSLOTS} -x $TMPDIR/Bowtie2Index/genome  \
-        -1 $TMPDIR/R1/${Sample}.R1.fq -2 $TMPDIR/R2/${Sample}.R2.fq  | samtools view -bS - > $TMPDIR/${Sample}.bam
+        -1 $TMPDIR/R1/${Sample}.R1.trim.fq -2 $TMPDIR/R2/${Sample}.R2.trim.fq  | samtools view -bS - > $TMPDIR/${Sample}.bam
    # samtools sort  $TMPDIR/${Sample}.bam -o $TMPDIR/${Sample}/${Sample}.sorted.bam
     #cp $TMPDIR/${Sample}/${Sample}.sorted.bam  $TMPDIR/${Sample}/${Sample}.bt2.sorted.bam
 else
     echo "----------bwa-mem aligning-------------"
-    echo "aligning : $TMPDIR/R1/${Sample}.R1.fq ,  $TMPDIR/R2/${Sample}.R2.fq using bwa-mem.."
+    echo "aligning : $TMPDIR/R1/${Sample}.R1.trim.fq ,  $TMPDIR/R2/${Sample}.R2.trim.fq using bwa-mem.."
     bwa mem -t ${NSLOTS} -M $TMPDIR/BWAIndex/genome.fa $TMPDIR/R1/${Sample}.R1.fq $TMPDIR/R2/${Sample}.R2.fq | samtools view -bS - >  $TMPDIR/${Sample}.bam
 fi
 

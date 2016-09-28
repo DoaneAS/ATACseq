@@ -1,20 +1,27 @@
 #!/bin/bash -l
-#$ -N Atac-u
+#$ -N AtacSeq
 #$ -j y
 #$ -m a
 #$ -cwd
 #$ -l zenodotus=true
 #$ -l os=rhel6.3
 #$ -M ashley.doane@gmail.com
-#$ -l h_rt=40:00:00
-#$ -pe smp 4
+#$ -l h_rt=40:50:00
+#$ -pe smp 4-8
 #$ -l h_vmem=12G
 #$ -R y
+
+########### SETTINGS ###########
+TRIM=1 # must be set to 1
+NUC=0
+BT2ALN=1
+##############################
 
 
 path=$1 #path to all the Samples
 gtf_path=$2 #Number indicating the reference gtf [1 for Human 2 for Mouse 3 for other]
 
+echo "requirements: deeptools, python 2.7, macs2, picard, java, sambamba, bwa, ucsc-tools"
 
 # Uses job array for each Sample in the folder
 file=$(ls ${path} | tail -n +${SGE_TASK_ID}| head -1)
@@ -38,12 +45,14 @@ Sample=${Sample%%.*}
 rsync -r -v -a -z $path/$file/*.gz ./
 
 rsync -r -v -a -z $path/$file/*.sra ./
-rsync -r -v -a -z $path/$file/ ./
+#rsync -r -v -a -z $path/$file/ ./
 #rsync -r -v -a -z $path/$file/ ./
 #rsync -r -v -a -z $path/$file/ ./
 
 #SRA=$(ls *.sra)
 
+
+parallel -j ${NSLOTS} 'fastq-dump --split-files {}' ::: *.sra
 #fastq-dump --split-files ${SRA}
 
 #fastq-dump --split-files *.sra
@@ -54,11 +63,13 @@ echo "Processing  $Sample ..."
 
 if [ $gtf_path == 1 ]
 then
-	gtf="/zenodotus/dat02/elemento_lab_scratch/oelab_scratch_scratch007/akv3001/mm10_UCSC_ref.gtf"
+	#gtf="/zenodotus/dat02/elemento_lab_scratch/oelab_scratch_scratch007/akv3001/mm10_UCSC_ref.gtf"
 	REF="/zenodotus/dat02/elemento_lab_scratch/oelab_scratch_scratch007/akv3001/Genomes/Homo_sapiens/UCSC/hg19/Sequence/BWAIndex"
 	REFbt2="/zenodotus/dat02/elemento_lab_scratch/oelab_scratch_scratch007/akv3001/Genomes/Homo_sapiens/UCSC/hg19/Sequence/Bowtie2Index"
    # REFbt="/home/asd20i07/dat02/asd2007/Reference/Homo_sapiens/UCSC/mm10/Sequence/BowtieIndex/genome"
     BLACK="/home/asd2007/dat02/asd2007/Reference/encodeBlack.bed"
+    BLACK="/home/asd2007/melnick_bcell_scratch/asd2007/Reference/hg19/Anshul_Hg19UltraHighSignalArtifactRegions.bed"
+    chrsz="/home/asd2007/melnick_bcell_scratch/asd2007/Reference/hg19.genome.chrom.sizes"
     RG="hg19"
 elif [ $gtf_path == 2 ]
 then
@@ -67,6 +78,7 @@ then
     REFbt2="/zenodotus/dat02/elemento_lab_scratch/oelab_scratch_scratch007/akv3001/Genomes/Mus_musculus/UCSC/mm10/Sequence/Bowtie2Index"
     BLACK="/home/asd2007/dat02/asd2007/Reference/mm10-blacklist.bed"
     RG="mm10"
+    chrsz="/home/asd2007/melnick_bcell_scratch/asd2008/Reference/mm10.genome.chrom.sizes"
 else
 	gtf="/zenodotus/dat02/elemento_lab_scratch/oelab_scratch_scratch007/akv3001/mm10_UCSC_ref.gtf"
 	REF="/zenodotus/dat02/elemento_lab_scratch/oelab_scratch_scratch007/akv3001/Genomes/Homo_sapiens/UCSC/mm10/Sequence/BWAIndex/genome.fa"
@@ -83,29 +95,39 @@ rsync -avP ${REF} $TMPDIR/
 
 rsync -avP ${REFbt2} $TMPDIR/
 
-mkdir R1
-mkdir R2
-mkdir ${Sample}
-
-gunzip *.gz
+mkdir ${TMPDIR}/${Sample}
 
 
-mv *_R1* R1/
-mv *_R2* R2/
-
-mv *_1* R1/
-mv *_2* R2/
 
 
-mv *val_1* R1/
-mv *val_2* R2/
-#mv *_1.fastq R1/
+
+
+
+ls -lrth
+
+
+#gunzip *.gz
+
+
+
+#mkdir R1
+#mkdir R2
+
+#cat  *R1*trim* > $TMPDIR/R1/${Sample}.R1.fastq
+#cat  *R2*trim* > $TMPDIR/R2/${Sample}.R2.fastq
+
+#mv *_1* R1/
+#mv *_2* R2/
+
+
+#mv *val_1* R1/
+#mv *val_2* R2/
+#mv 7774444*_1.fastq R1/
 #mv *_2.fastq R2/
 
 
 
 #count=$(ls -l R1/ |wc -l)
-echo "----------bwa-mem aligning-------------"
 #Use bwa mem to align each pair in data set
 
 F1=$(ls R1)
@@ -115,32 +137,44 @@ echo "aligning : $F1 , $F2 using bwa-mem.."
 
 #gunzip -c $TMPDIR/R1/$F1 > $TMPDIR/R1/${Sample}.R1.fastq
 #gunzip -c $TMPDIR/R2/$F2 > $TMPDIR/R2/${Sample}.R2.fastq
-cat $TMPDIR/R1/*.*q > $TMPDIR/R1/${Sample}.R1.fastq
-cat $TMPDIR/R2/*.*q > $TMPDIR/R2/${Sample}.R2.fastq
+#cat $TMPDIR/R1/*.*q > $TMPDIR/R1/${Sample}.R1.fastq
+#cat $TMPDIR/R2/*.*q > $TMPDIR/R2/${Sample}.R2.fastq
 
 
-cutadapt -m 5 -e 0.20 -a CTGTCTCTTATA -A CTGTCTCTTATA -o $TMPDIR/R1/${Sample}.R1.fq -p $TMPDIR/R2/${Sample}.R2.fq $TMPDIR/R1/${Sample}.R1.fastq $TMPDIR/R2/${Sample}.R2.fastq
+if [ $TRIM == 1 ]
+then
+    echo "Trimming adapter sequences, with command..."
+    cat *R1*  > ${Sample}.R1.fastq.gz
+    cat *R2* >  ${Sample}.R2.fastq.gz
+    trimAdapters.py -a ${Sample}.R1.fastq.gz -b ${Sample}.R2.fastq.gz
+   echo "completed trimming"
+else
+    echo "will not perform adapter sequence trimming of reads, exiting pipeline"
+   # mv $TMPDIR/R2/${Sample}.R2.fastq $TMPDIR/R2/${Sample}.R2.trim.fastq
+   # mv $TMPDIR/R1/${Sample}.R1.fastq $TMPDIR/R1/${Sample}.R1.trim.fastq
+fi
 
 
 #bowtie2  -X 2000 -p ${NSLOTS} -x $TMPDIR/Bowtie2Index/genome -1 $TMPDIR/R1/${Sample}.R1.fq -2 $TMPDIR/R2/${Sample}.R2.fq -S $TMPDIR/${Sample}/${Sample}.bt2.sam
 
 
-echo "aligning : $TMPDIR/R1/${Sample}.R1.fq ,  $TMPDIR/R2/${Sample}.R2.fq using bwa-mem.."
 
-bwa mem -t ${NSLOTS} -M $TMPDIR/BWAIndex/genome.fa $TMPDIR/R1/${Sample}.R1.fq $TMPDIR/R2/${Sample}.R2.fq > $TMPDIR/${Sample}/${Sample}.sam
-
-
-
+if [ $BT2ALN == 1 ]
+then
+    echo "----------bowtie2 aligning-------------"
+    bowtie2 -k 4 -X2000 --mm --threads ${NSLOTS} -x $TMPDIR/Bowtie2Index/genome  \
+        -1 $TMPDIR/${Sample}.R1.trim.fastq -2 $TMPDIR/${Sample}.R2.trim.fastq  | samtools view -bS - > $TMPDIR/${Sample}.bam
+   # samtools sort  $TMPDIR/${Sample}.bam -o $TMPDIR/${Sample}/${Sample}.sorted.bam
+    #cp $TMPDIR/${Sample}/${Sample}.sorted.bam  $TMPDIR/${Sample}/${Sample}.bt2.sorted.bam``
+else
+    echo "----------bwa-mem aligning-------------"
+    echo "aligning : $TMPDIR/${Sample}.R1.trim.fq ,  $TMPDIR/${Sample}.R2.trim.fq using bwa-mem.."
+    bwa mem -t ${NSLOTS} -M $TMPDIR/BWAIndex/genome.fa $TMPDIR/${Sample}.R1.trim.fastq $TMPDIR/${Sample}.R2.trim.fastq | samtools view -bS - >  $TMPDIR/${Sample}.bam
+fi
 
 echo "----------Samtools Converting to Sorted bam-----------------"
 
-#samtools view -bS $TMPDIR/${Sample}/${Sample}.sam| samtools sort  - $TMPDIR/${Sample}/${Sample}.sorted
-
-samtools view -bS $TMPDIR/${Sample}/${Sample}.sam | samtools sort  - -o $TMPDIR/${Sample}/${Sample}.sorted.bam
-
-#TMPDIR/${Sample}/${Sample}.bt2.sam
-
-#samtools view -bS $TMPDIR/${Sample}/${Sample}.bt2.sam | samtools sort  - -o $TMPDIR/${Sample}/${Sample}.bt2.sorted.bam
+samtools sort -n  $TMPDIR/${Sample}.bam -o $TMPDIR/${Sample}/${Sample}.sorted.bam
 
 echo "get insert Sizes of unfiltered alignments"
 

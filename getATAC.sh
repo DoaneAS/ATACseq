@@ -12,7 +12,7 @@
 #$ -R y
 
 ########### SETTINGS ###########
-TRIM=0
+TRIM=1 # must be set to 1
 NUC=0
 BT2ALN=1
 ##############################
@@ -95,18 +95,11 @@ rsync -avP ${REF} $TMPDIR/
 
 rsync -avP ${REFbt2} $TMPDIR/
 
-mkdir R1
-mkdir R2
 mkdir ${TMPDIR}/${Sample}
 
 
 
 
-cat *_R1*  > ${Sample}.R1.fastq.gz
-cat *_R2* >  ${Sample}.R2.fastq.gz
-
-
-pyadapter_trim.py -a ${Sample}.R1.fastq.gz -b ${Sample}.R2.fastq.gz
 
 
 
@@ -117,6 +110,8 @@ ls -lrth
 
 
 
+#mkdir R1
+#mkdir R2
 
 cat  *R1*trim* > $TMPDIR/R1/${Sample}.R1.fastq
 cat  *R2*trim* > $TMPDIR/R2/${Sample}.R2.fastq
@@ -149,15 +144,14 @@ echo "aligning : $F1 , $F2 using bwa-mem.."
 if [ $TRIM == 1 ]
 then
     echo "Trimming adapter sequences, with command..."
-  #  echo "cutadapt command: cutadapt -m 5 -e 0.2 -a CTGTCTCTTATA -A CTGTCTCTTATA -o $TMPDIR/R1/${Sample}.R1.fq -p $TMPDIR/R2/${Sample}.R2.fq $TMPDIR/R1/${Sample}.R1.fastq $TMPDIR/R2/${Sample}.R2.fastq"
-   # cutadapt -m 5 -e 0.2 -a CTGTCTCTTATA -A CTGTCTCTTATA -o $TMPDIR/R1/${Sample}.R1.fq -p $TMPDIR/R2/${Sample}.R2.fq $TMPDIR/R1/${Sample}.R1.fastq $TMPDIR/R2/${Sample}.R2.fastq;
-   echo "pyadapter_trim.py"
-   pyadapter_trim.py -a $TMPDIR/R1/${Sample}.R1.fastq -b $TMPDIR/R2/${Sample}.R2.fastq
+    cat *R1*  > ${Sample}.R1.fastq.gz
+    cat *R2* >  ${Sample}.R2.fastq.gz
+    trimAdapters.py -a ${Sample}.R1.fastq.gz -b ${Sample}.R2.fastq.gz
    echo "completed trimming"
 else
-    echo "will not perform adapter sequence trimming of reads"
- #   mv $TMPDIR/R2/${Sample}.R2.fastq $TMPDIR/R2/${Sample}.R2.trim.fastq
- #   mv $TMPDIR/R1/${Sample}.R1.fastq $TMPDIR/R1/${Sample}.R1.trim.fastq
+    echo "will not perform adapter sequence trimming of reads, exiting pipeline"
+   # mv $TMPDIR/R2/${Sample}.R2.fastq $TMPDIR/R2/${Sample}.R2.trim.fastq
+   # mv $TMPDIR/R1/${Sample}.R1.fastq $TMPDIR/R1/${Sample}.R1.trim.fastq
 fi
 
 
@@ -169,141 +163,146 @@ if [ $BT2ALN == 1 ]
 then
     echo "----------bowtie2 aligning-------------"
     bowtie2 -k 4 -X2000 --mm --threads ${NSLOTS} -x $TMPDIR/Bowtie2Index/genome  \
-        -1 $TMPDIR/R1/${Sample}.R1.trim.fastq -2 $TMPDIR/R2/${Sample}.R2.trim.fastq  | samtools view -bS - > $TMPDIR/${Sample}.bam
+        -1 $TMPDIR/${Sample}.R1.trim.fastq -2 $TMPDIR/${Sample}.R2.trim.fastq | \
+        samtools view -bS - > $TMPDIR/${Sample}/${Sample}.bam
    # samtools sort  $TMPDIR/${Sample}.bam -o $TMPDIR/${Sample}/${Sample}.sorted.bam
-    #cp $TMPDIR/${Sample}/${Sample}.sorted.bam  $TMPDIR/${Sample}/${Sample}.bt2.sorted.bam
+    #cp $TMPDIR/${Sample}/${Sample}.sorted.bam  $TMPDIR/${Sample}/${Sample}.bt2.sorted.bam``
 else
     echo "----------bwa-mem aligning-------------"
-    echo "aligning : $TMPDIR/R1/${Sample}.R1.trim.fq ,  $TMPDIR/R2/${Sample}.R2.trim.fq using bwa-mem.."
-    bwa mem -t ${NSLOTS} -M $TMPDIR/BWAIndex/genome.fa $TMPDIR/R1/${Sample}.R1.trim.fastq $TMPDIR/R2/${Sample}.R2.trim.fastq | samtools view -bS - >  $TMPDIR/${Sample}.bam
+    echo "aligning : $TMPDIR/${Sample}.R1.trim.fq ,  $TMPDIR/${Sample}.R2.trim.fq using bwa-mem.."
+    bwa mem -t ${NSLOTS} -M $TMPDIR/BWAIndex/genome.fa $TMPDIR/${Sample}.R1.trim.fastq $TMPDIR/${Sample}.R2.trim.fastq | samtools view -bS - >  $TMPDIR/${Sample}.bam
 fi
 
 echo "----------Samtools Converting to Sorted bam-----------------"
 
-samtools sort -n  $TMPDIR/${Sample}.bam -o $TMPDIR/${Sample}/${Sample}.sorted.bam
+processBamAlignment.sh $TMPDIR/${Sample}/${Sample}.bam
 
-echo "get insert Sizes of unfiltered alignments"
-
-samtools view -f66 $TMPDIR/${Sample}/${Sample}.sorted.bam |cut -f 9|sed 's/^-//' > $TMPDIR/${Sample}/${Sample}.raw.InsertSizeMetrics.txt
-
-#samtools view -f66 $TMPDIR/${Sample}/${Sample}.bt2.sorted.bam |cut -f 9|sed 's/^-//' > $TMPDIR/${Sample}/${Sample}.raw.bt2.InsertSizeMetrics.txt
-
-#remove sam file after converted to sorted bam
-#rm $TMPDIR/${Sample}/${Sample}*.sam
-
-
-echo "Create index"
-
-samtools index  $TMPDIR/${Sample}/${Sample}.sorted.bam
-
-
-RAW_BAM_FILE="$TMPDIR/${Sample}/${Sample}.sorted.bam"
-
-
-
-echo "----------------------Removing duplicates--------------------"
-java -Xmx8g -jar /home/akv3001/Programs/picard/dist/picard.jar MarkDuplicates INPUT=${RAW_BAM_FILE} METRICS_FILE=$TMPDIR/${Sample}/dedup.txt \
-    OUTPUT=$TMPDIR/${Sample}.sorted.u.nodup.bam VALIDATION_STRINGENCY=LENIENT REMOVE_DUPLICATES=true
-
-
-
-#java -Xmx4g -jar /zenodotus/dat02/elemento_lab_scratch/oelab_scratch_scratch007/akv3001/picard-tools-1.119/MarkDuplicates.jar INPUT=$TMPDIR/${Sample}/${Sample}_sorted.bam METRICS_FILE=$TMPDIR/${Sample}/dedup.txt OUTPUT=$TMPDIR/${Sample}/${Sample}_noDuplicates.bam VALIDATION_STRINGENCY=LENIENT REMOVE_DUPLICATES=true TMP_DIR=/zenodotus/dat02/elemento_lab_scratch/oelab_scratch_scratch007/akv3001/Irene_2_Samples/tmp
-
-#rsync -a -vP $TMPDIR/${Sample} $path/${Sample}
-
-
-samtools view -q 20 -F 1804 -b ${TMPDIR}/${Sample}.sorted.u.nodup.bam > $TMPDIR/${Sample}/${Sample}.sorted.nodup.bam
-sambamba index -t ${NSLOTS} $TMPDIR/${Sample}/${Sample}.sorted.nodup.bam
-sambamba flagstat -t ${NSLOTS} $TMPDIR/${Sample}/${Sample}.sorted.nodup.bam > $TMPDIR/${Sample}/${Sample}.mapqc.txt
-
-
-rsync -av /home/asd2007/Scripts/picardmetrics.conf ./
-
-mkdir metrics
-
-#picardmetrics run -o $TMPDIR/metrics $TMPDIR/${Sample}/${Sample}.sorted.bam
-
-
-pbc_qc=$TMPDIR/${Sample}/${Sample}.library_complexity.qc.txt
-
-
-dupmark_bam=$TMPDIR/${Sample}/${Sample}.sorted.nodup.bam
-
-## TotalReadPairs [tab] DistinctReadPairs [tab] OneReadPair [tab] TwoReadPairs [tab] NRF=Distinct/Total [tab] PBC1=OnePair/Distinct [tab] PBC2=OnePair/TwoPair
-sambamba sort -t ${NSLOTS} -n  $TMPDIR/${Sample}/${Sample}.sorted.nodup.bam -o $TMPDIR/${Sample}/${Sample}.nsorted.nodup.bam
-
-
-bedtools bamtobed -bedpe -i  $TMPDIR/${Sample}/${Sample}.nsorted.nodup.bam | \
-    awk 'BEGIN{OFS="\t"}{print $1,$2,$4,$6,$9,$10}' | \
-    grep -v 'chrM' | sort | uniq -c | \
-    awk 'BEGIN{mt=0;m0=0;m1=0;m2=0} ($1==1){m1=m1+1} ($1==2){m2=m2+1} {m0=m0+1} {mt=mt+$1} END{m1_m2=-1.0; if(m2>0) m1_m2=m1/m2; printf "%d\t%d\t%d\t%d\t%f\t%f\t%f\n",mt,m0,m1,m2,m0/mt,m1/m0,m1_m2}' > $pbc_qc
-
-
-echo "-----------------------------Remove chrm------------------------------"
-
-
-samtools idxstats $TMPDIR/${Sample}/${Sample}.sorted.nodup.bam | cut -f 1 | grep -v chrM | xargs samtools view -b $TMPDIR/${Sample}/${Sample}.sorted.nodup.bam > $TMPDIR/${Sample}/${Sample}.sorted.nodup.noM.bam
-
-samtools index $TMPDIR/${Sample}/${Sample}.sorted.nodup.noM.bam
-
-
+#
+#samtools view -bS $TMPDIR/${Sample}.sam | samtools sort  - -o $TMPDIR/${Sample}/${Sample}.sorted.bam
+#
+#samtools view -bS $TMPDIR/${Sample}.sam | samtools sort  - -o $TMPDIR/${Sample}/${Sample}.bam
+#
+#echo "get insert Sizes of unfiltered alignments"
+#
+#samtools view -f66 $TMPDIR/${Sample}/${Sample}.sorted.bam |cut -f 9|sed 's/^-//' > $TMPDIR/${Sample}/${Sample}.raw.InsertSizeMetrics.txt
+#
+##samtools view -f66 $TMPDIR/${Sample}/${Sample}.bt2.sorted.bam |cut -f 9|sed 's/^-//' > $TMPDIR/${Sample}/${Sample}.raw.bt2.InsertSizeMetrics.txt
+#
+##remove sam file after converted to sorted bam
+##rm $TMPDIR/${Sample}/${Sample}*.sam
+#
+#
+#echo "Create index"
+#
+#samtools index  $TMPDIR/${Sample}/${Sample}.sorted.bam
+#
+#
+#RAW_BAM_FILE="$TMPDIR/${Sample}/${Sample}.sorted.bam"
+#
+#
+#
+#echo "----------------------Removing duplicates--------------------"
+#java -Xmx8g -jar /home/akv3001/Programs/picard/dist/picard.jar MarkDuplicates INPUT=${RAW_BAM_FILE} METRICS_FILE=$TMPDIR/${Sample}/dedup.txt \
+#    OUTPUT=$TMPDIR/${Sample}.sorted.u.nodup.bam VALIDATION_STRINGENCY=LENIENT REMOVE_DUPLICATES=true
+#
+#
+#
+##java -Xmx4g -jar /zenodotus/dat02/elemento_lab_scratch/oelab_scratch_scratch007/akv3001/picard-tools-1.119/MarkDuplicates.jar INPUT=$TMPDIR/${Sample}/${Sample}_sorted.bam METRICS_FILE=$TMPDIR/${Sample}/dedup.txt OUTPUT=$TMPDIR/${Sample}/${Sample}_noDuplicates.bam VALIDATION_STRINGENCY=LENIENT REMOVE_DUPLICATES=true TMP_DIR=/zenodotus/dat02/elemento_lab_scratch/oelab_scratch_scratch007/akv3001/Irene_2_Samples/tmp
+#
+##rsync -a -vP $TMPDIR/${Sample} $path/${Sample}
+#
+#
+#samtools view -q 20 -F 1804 -b ${TMPDIR}/${Sample}.sorted.u.nodup.bam > $TMPDIR/${Sample}/${Sample}.sorted.nodup.bam
+#sambamba index -t ${NSLOTS} $TMPDIR/${Sample}/${Sample}.sorted.nodup.bam
+#sambamba flagstat -t ${NSLOTS} $TMPDIR/${Sample}/${Sample}.sorted.nodup.bam > $TMPDIR/${Sample}/${Sample}.mapqc.txt
+#
+#
+#rsync -av /home/asd2007/Scripts/picardmetrics.conf ./
+#
+#mkdir metrics
+#
+##picardmetrics run -o $TMPDIR/metrics $TMPDIR/${Sample}/${Sample}.sorted.bam
+#
+#
+#pbc_qc=$TMPDIR/${Sample}/${Sample}.library_complexity.qc.txt
+#
+#
+#dupmark_bam=$TMPDIR/${Sample}/${Sample}.sorted.nodup.bam
+#
+### TotalReadPairs [tab] DistinctReadPairs [tab] OneReadPair [tab] TwoReadPairs [tab] NRF=Distinct/Total [tab] PBC1=OnePair/Distinct [tab] PBC2=OnePair/TwoPair
+#sambamba sort -t ${NSLOTS} -n  $TMPDIR/${Sample}/${Sample}.sorted.nodup.bam -o $TMPDIR/${Sample}/${Sample}.nsorted.nodup.bam
+#
+#
+#bedtools bamtobed -bedpe -i  $TMPDIR/${Sample}/${Sample}.nsorted.nodup.bam | \
+#    awk 'BEGIN{OFS="\t"}{print $1,$2,$4,$6,$9,$10}' | \
+#    grep -v 'chrM' | sort | uniq -c | \
+#    awk 'BEGIN{mt=0;m0=0;m1=0;m2=0} ($1==1){m1=m1+1} ($1==2){m2=m2+1} {m0=m0+1} {mt=mt+$1} END{m1_m2=-1.0; if(m2>0) m1_m2=m1/m2; printf "%d\t%d\t%d\t%d\t%f\t%f\t%f\n",mt,m0,m1,m2,m0/mt,m1/m0,m1_m2}' > $pbc_qc
+#
+#
+#echo "-----------------------------Remove chrm------------------------------"
+#
+#
+#samtools idxstats $TMPDIR/${Sample}/${Sample}.sorted.nodup.bam | cut -f 1 | grep -v chrM | xargs samtools view -b $TMPDIR/${Sample}/${Sample}.sorted.nodup.bam > $TMPDIR/${Sample}/${Sample}.sorted.nodup.noM.bam
+#
+#samtools index $TMPDIR/${Sample}/${Sample}.sorted.nodup.noM.bam
+#
+#
+##picardmetrics run -o $TMPDIR/metrics $TMPDIR/${Sample}/${Sample}.sorted.nodup.noM.bam
+#
+##mkdir /zenodotus/dat01/melnick_bcell_scratch/asd2007/atacData/QCmetrics/${Sample}
+##rsync -r -v $TMPDIR/metrics /zenodotus/dat01/melnick_bcell_scratch/asd2007/atacData/QCmetrics/${Sample}/
+#
+#echo "-----------------  additional QC ---------------------"
+#
+#rsync -av /home/asd2007/Scripts/picardmetrics.conf ./
+#
+#mkdir metrics
+#
+#
+#samtools idxstats $TMPDIR/${Sample}/${Sample}.sorted.nodup.bam | grep chrM > $TMPDIR/metrics/chrM.txt
+#
 #picardmetrics run -o $TMPDIR/metrics $TMPDIR/${Sample}/${Sample}.sorted.nodup.noM.bam
-
-#mkdir /zenodotus/dat01/melnick_bcell_scratch/asd2007/atacData/QCmetrics/${Sample}
-#rsync -r -v $TMPDIR/metrics /zenodotus/dat01/melnick_bcell_scratch/asd2007/atacData/QCmetrics/${Sample}/
-
-echo "-----------------  additional QC ---------------------"
-
-rsync -av /home/asd2007/Scripts/picardmetrics.conf ./
-
-mkdir metrics
-
-
-samtools idxstats $TMPDIR/${Sample}/${Sample}.sorted.nodup.bam | grep chrM > $TMPDIR/metrics/chrM.txt
-
-picardmetrics run -o $TMPDIR/metrics $TMPDIR/${Sample}/${Sample}.sorted.nodup.noM.bam
-
-
-#picardmetrics run -o $TMPDIR/metrics $TMPDIR/${Sample}/${Sample}.sorted.nodup.noM.bam
-
-#mkdir /zenodotus/dat01/melnick_bcell_scratch/asd2007/atacData/QCmetrics/${Sample}
-rsync -r -v $TMPDIR/metrics $path/${Sample}
-
-######## histogram file
-for w in 1000 500 200
-do
-    picard CollectInsertSizeMetrics I=$TMPDIR/${Sample}/${Sample}.sorted.nodup.noM.bam O="$TMPDIR/${Sample}/${Sample}.window${w}.hist_data" H="$TMPDIR/${Sample}/${Sample}.window${w}.hist_graph.pdf" W=${w}
-done
-
-echo "--------------------------Removing encode black listed intervals---------------------------"
-
-
-
-#bedtools subtract -A -a $TMPDIR/${Sample}/${Sample}.sorted.nodup.noM.bam -b $BLACK > $TMPDIR/${Sample}/${Sample}.sorted.nodup.noM.black.bam
-
-#samtools index $TMPDIR/${Sample}/${Sample}.sorted.nodup.noM.black.bam
-
-samtools flagstat  $TMPDIR/${Sample}/${Sample}.sorted.nodup.noM.bam > $TMPDIR/${Sample}/${Sample}.finalBam.mapStats.txt
-
-rsync -avP $TMPDIR/${Sample} $path/${Sample}
-
-
-echo "--------------------------Tn5 adjusted bedfile for MACS2 peak calling---------------------------"
-
+#
+#
+##picardmetrics run -o $TMPDIR/metrics $TMPDIR/${Sample}/${Sample}.sorted.nodup.noM.bam
+#
+##mkdir /zenodotus/dat01/melnick_bcell_scratch/asd2007/atacData/QCmetrics/${Sample}
+#rsync -r -v $TMPDIR/metrics $path/${Sample}
+#
+######### histogram file
+#for w in 1000 500 200
+#do
+#    picard CollectInsertSizeMetrics I=$TMPDIR/${Sample}/${Sample}.sorted.nodup.noM.bam O="$TMPDIR/${Sample}/${Sample}.window${w}.hist_data" H="$TMPDIR/${Sample}/${Sample}.window${w}.hist_graph.pdf" W=${w}
+#done
+#
+#echo "--------------------------Removing encode black listed intervals---------------------------"
+#
+#
+#
+##bedtools subtract -A -a $TMPDIR/${Sample}/${Sample}.sorted.nodup.noM.bam -b $BLACK > $TMPDIR/${Sample}/${Sample}.sorted.nodup.noM.black.bam
+#
+##samtools index $TMPDIR/${Sample}/${Sample}.sorted.nodup.noM.black.bam
+#
+#samtools flagstat  $TMPDIR/${Sample}/${Sample}.sorted.nodup.noM.bam > $TMPDIR/${Sample}/${Sample}.finalBam.mapStats.txt
+#
+#rsync -avP $TMPDIR/${Sample} $path/${Sample}
+#
+#
+#echo "--------------------------Tn5 adjusted bedfile for MACS2 peak calling---------------------------"
+#
 samtools view -H $TMPDIR/${Sample}/${Sample}.sorted.nodup.noM.bam | grep chr | grep -v chrM | /home/ole2001/PERL_SCRIPTS/columns.pl 1 2 | sed 's/SN://' | sed 's/LN://' > chrom.sizes
-
-#/home/ole2001/PROGRAMS/SOFT/bedtools2/bin/bamToBed -i $TMPDIR/${Sample}/${Sample}.mm10.sorted.nodup.noM.black.bam | \
-#     sh /home/asd2007/bin/adjustBedTn5.sh  > $TMPDIR/${Sample}/${Sample}.sorted.nodup.noM.black.bed
-bamToBed -i $TMPDIR/${Sample}/${Sample}.sorted.nodup.noM.bam | \
-    bedtools subtract -A -a - -b $BLACK | \
+#
+##/home/ole2001/PROGRAMS/SOFT/bedtools2/bin/bamToBed -i $TMPDIR/${Sample}/${Sample}.mm10.sorted.nodup.noM.black.bam | \
+##     sh /home/asd2007/bin/adjustBedTn5.sh  > $TMPDIR/${Sample}/${Sample}.sorted.nodup.noM.black.bed
+bamToBed -i $TMPDIR/${Sample}/${Sample}.sorted.nodup.noM.black.bam | \
     awk 'BEGIN{OFS="\t"} $6=="+" { $2=$2+4; $3=$3 ; $4="N" ; print $0 } $6=="-"{ $2=$2; $3=$3-5; $4="N" ; print $0 }' | gzip -c > $TMPDIR/${Sample}/${Sample}.tn5.tagAlign.gz
-
-
-bedtools bamtobed -bedpe -mate1 -i  $TMPDIR/${Sample}/${Sample}.sorted.nodup.noM.bam | gzip -c > $TMPDIR/${Sample}/${Sample}.tn5.bedpe.tagAlign.gz
-
-echo "----------------------------partition reads of <= 115= less than 123 after corrections ----------------------"
-samtools view -h ${TMPDIR}/${Sample}/${Sample}.sorted.nodup.noM.bam | awk '/^@/ || $9 <= 123 && $9 >= -123' | samtools view -b - > ${TMPDIR}/${Sample}/${Sample}.sorted.nodup.noM.frag123.bam
-
+#
+#
+#bedtools bamtobed -bedpe -mate1 -i  $TMPDIR/${Sample}/${Sample}.sorted.nodup.noM.bam | gzip -c > $TMPDIR/${Sample}/${Sample}.tn5.bedpe.tagAlign.gz
+#
+#echo "----------------------------partition reads of <= 115= less than 123 after corrections ----------------------"
+#samtools view -h ${TMPDIR}/${Sample}/${Sample}.sorted.nodup.noM.bam | awk '/^@/ || $9 <= 123 && $9 >= -123' | samtools view -b - > ${TMPDIR}/${Sample}/${Sample}.sorted.nodup.noM.frag123.bam
+#
 
 echo "------------------------------------------Call Peaks with MACS2--------------------------------------------"
 

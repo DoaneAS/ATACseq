@@ -35,12 +35,15 @@ out2m=$(echo $out1 | sed 's/\.bam$/.nodup.noM.bam/')
 
 samtools idxstats $out2 | cut -f 1 | grep -v chrM | xargs samtools view -b $out2 > $out2m
 
+
+
 out2mb=$(echo $out1 | sed 's/\.bam$/.no.black.bam/')
 bedtools subtract -A -a $out2m -b $BLACK > $out2mb
 # Remove multimapping and improper reads
 out3=$(echo $out1 | sed 's/\.bam$/.nodup.noM.black.bam/')
 samtools view -q 20 -F 1804 -b ${out2mb} > ${out3}
 samtools index $out3
+
 
 
 # histogram file

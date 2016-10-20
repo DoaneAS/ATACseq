@@ -132,7 +132,7 @@ else
     bwa mem -t ${NSLOTS} -M $TMPDIR/BWAIndex/genome.fa $TMPDIR/${Sample}.R1.trim.fastq $TMPDIR/${Sample}.R2.trim.fastq | samtools view -bS - >  $TMPDIR/${Sample}.bam
 fi
 
-echo "----------Samtools Converting to Sorted bam-----------------"
+echo "----------Processing alignment and filtering for duplicates and mitochondrial mapping reads-----------------"
 
 processBamAlignment.sh $TMPDIR/${Sample}/${Sample}.bam
 
@@ -161,10 +161,9 @@ echo "------------------------------------------Call Peaks with MACS2-----------
 #macs2 callpeak -t $TMPDIR/${Sample}/Sample_N5.nsorted.fixmate.nodup.noM.black.bedpe.gz -f BED -n $TMPDIR/${Sample}/${Sample}.narrow -g hs --nomodel --shift -75 --extsize 150 --keep-dup all --call-summits -p 1e-2
 
 
-macs2 callpeak -t  $TMPDIR/${Sample}/${Sample}.nsorted.fixmate.nodup.noM.black.Tn5.tagAlign.gz -f BED -n $TMPDIR/${Sample}/${Sample}.tag.broad -g hs  --nomodel --shift -75 --extsize 150 --keep-dup all --call-summits -p 1e-3
+macs2 callpeak -t  $TMPDIR/${Sample}/${Sample}.nsorted.fixmate.nodup.noM.black.Tn5.tagAlign.gz -f BED -n $TMPDIR/${Sample}/${Sample}.tag.narrow -g hs  --nomodel --shift -75 --extsize 150 --keep-dup all --call-summits -p 1e-3
 
-
-macs2 callpeak -t  $TMPDIR/${Sample}/${Sample}.nsorted.fixmate.nodup.noM.black.bedpe.gz -f BEDPE -n $TMPDIR/${Sample}/${Sample}.bedpe.broad -g hs  --nomodel --shift -75 --extsize 150 --keep-dup all --call-summits -p 1e-3
+macs2 callpeak -t  $TMPDIR/${Sample}/${Sample}.nsorted.fixmate.nodup.noM.black.bedpe.gz -f BEDPE -n $TMPDIR/${Sample}/${Sample}.bedpe.narrow -g hs  --nomodel --shift -75 --extsize 150 --keep-dup all --call-summits -p 1e-3
 
 macs2 callpeak -t $TMPDIR/${Sample}/${Sample}.sorted.nodup.noM.black.bam -f BAMPE -n $TMPDIR/${Sample}/${Sample}.narrow -g hs --nomodel --shift -75 --extsize 150 --keep-dup all --call-summits -p 1e-3
 

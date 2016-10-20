@@ -7,7 +7,7 @@
 #$ -l os=rhel6.3
 #$ -M ashley.doane@gmail.com
 #$ -l h_rt=47:50:00
-#$ -pe smp 8
+#$ -pe smp 8-16
 #$ -l h_vmem=12G
 #$ -R y
 
@@ -139,10 +139,14 @@ processBamAlignment.sh $TMPDIR/${Sample}/${Sample}.bam
 samtools sort -n $TMPDIR/${Sample}/${Sample}.sorted.nodup.noM.black.bam -o $TMPDIR/${Sample}/${Sample}.nsorted.nodup.noM.black.bam
 
 echo "--------------------------Tn5 adjusted bedfile for MACS2 peak calling---------------------------"
-#
+
+samtools fixmate $TMPDIR/${Sample}/${Sample}.nsorted.nodup.noM.black.bam $TMPDIR/${Sample}/${Sample}.nsorted.fixmate.nodup.noM.black.bam
+
+convertBamtoBed.sh $TMPDIR/${Sample}/${Sample}.nsorted.fixmate.nodup.noM.black.bam
+
 samtools view -H $TMPDIR/${Sample}/${Sample}.sorted.nodup.noM.bam | grep chr | grep -v chrM | /home/ole2001/PERL_SCRIPTS/columns.pl 1 2 | sed 's/SN://' | sed 's/LN://' > chrom.sizes
 #
-
+$TMPDIR/${Sample}/${Sample}.nsorted.fixmate.nodup.noM.black.bam
 
 echo "------------------------------------------Call Peaks with MACS2--------------------------------------------"
 
@@ -154,9 +158,13 @@ echo "------------------------------------------Call Peaks with MACS2-----------
 #macs2 callpeak -t <(${adjustedBed}) -f BED -n $TMPDIR/${Sample}/${Sample}.narrow -g mm -p 1e-3 --nomodel --shift 75 -B --SPMR --keep-dup all --call-summits
 
 
-#macs2 callpeak -t $TMPDIR/${Sample}/${Sample}.tn5.tagAlign.gz -f BED -n $TMPDIR/${Sample}/${Sample}.narrow -g hs --nomodel --shift -75 --extsize 150 --keep-dup all --call-summits -p 1e-2
+#macs2 callpeak -t $TMPDIR/${Sample}/Sample_N5.nsorted.fixmate.nodup.noM.black.bedpe.gz -f BED -n $TMPDIR/${Sample}/${Sample}.narrow -g hs --nomodel --shift -75 --extsize 150 --keep-dup all --call-summits -p 1e-2
 
-#macs2 callpeak -t $TMPDIR/${Sample}/${Sample}.tn5.tagAlign.gz -f BED -n $TMPDIR/${Sample}/${Sample}.broad -g hs  --nomodel --shift -75 --extsize 150 --keep-dup all --broad --broad-cutoff 0.1
+
+macs2 callpeak -t  $TMPDIR/${Sample}/${Sample}.nsorted.fixmate.nodup.noM.black.Tn5.tagAlign.gz -f BED -n $TMPDIR/${Sample}/${Sample}.tag.broad -g hs  --nomodel --shift -75 --extsize 150 --keep-dup all --call-summits -p 1e-3
+
+
+macs2 callpeak -t  $TMPDIR/${Sample}/${Sample}.nsorted.fixmate.nodup.noM.black.bedpe.gz -f BEDPE -n $TMPDIR/${Sample}/${Sample}.bedpe.broad -g hs  --nomodel --shift -75 --extsize 150 --keep-dup all --call-summits -p 1e-3
 
 macs2 callpeak -t $TMPDIR/${Sample}/${Sample}.sorted.nodup.noM.black.bam -f BAMPE -n $TMPDIR/${Sample}/${Sample}.narrow -g hs --nomodel --shift -75 --extsize 150 --keep-dup all --call-summits -p 1e-3
 

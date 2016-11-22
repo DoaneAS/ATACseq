@@ -7,7 +7,7 @@
 #$ -l os=rhel6.3
 #$ -M ashley.doane@gmail.com
 #$ -l h_rt=47:50:00
-#$ -pe smp 8-16
+#$ -pe smp 8
 #$ -l h_vmem=12G
 #$ -R y
 
@@ -71,6 +71,8 @@ then
     BLACK="/home/asd2007/melnick_bcell_scratch/asd2007/Reference/hg19/Anshul_Hg19UltraHighSignalArtifactRegions.bed"
     chrsz="/home/asd2007/melnick_bcell_scratch/asd2007/Reference/hg19.genome.chrom.sizes"
     RG="hg19"
+    REFGen="/home/asd2007/melnick_bcell_scratch/asd2007/bin/bcbio/genomes/Hsapiens/hg19/seq/"
+
 elif [ $gtf_path == 2 ]
 then
 	gtf="/zenodotus/dat02/elemento_lab_scratch/oelab_scratch_scratch007/akv3001/Mus_UCSC_ref.gtf"
@@ -154,11 +156,6 @@ echo "------------------------------------------Call Peaks with MACS2-----------
 #adjustedBed="/home/ole2001/PROGRAMS/SOFT/bedtools2/bin/slopBed -i $TMPDIR/${Sample}/${Sample}.sorted.nodup.noM.black.bed -g sizes -l 75 -r -75 -s"
 
 #macs2 callpeak -t <(${adjustedBed}) -f BED -n $TMPDIR/${Sample}/${Sample}.broad -g 2.7e9 -p 1e-3 --nomodel --shift 75 -B --SPMR --broad --keep-dup all
-
-#macs2 callpeak -t <(${adjustedBed}) -f BED -n $TMPDIR/${Sample}/${Sample}.narrow -g mm -p 1e-3 --nomodel --shift 75 -B --SPMR --keep-dup all --call-summits
-
-
-#macs2 callpeak -t $TMPDIR/${Sample}/Sample_N5.nsorted.fixmate.nodup.noM.black.bedpe.gz -f BED -n $TMPDIR/${Sample}/${Sample}.narrow -g hs --nomodel --shift -75 --extsize 150 --keep-dup all --call-summits -p 1e-2
 
 
 macs2 callpeak -t  $TMPDIR/${Sample}/${Sample}.nsorted.fixmate.nodup.noM.black.Tn5.tagAlign.gz -f BED -n $TMPDIR/${Sample}/${Sample}.tag.narrow -g hs  --nomodel --shift -75 --extsize 150 --keep-dup all --call-summits -p 1e-3

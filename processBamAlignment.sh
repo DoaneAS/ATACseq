@@ -25,7 +25,7 @@ samtools index $out1
 echo "Removing duplicates..."
 out2=$(echo ${out1} | sed 's/\.bam$/.nodup.bam/')
 echo ${out2}
-picard MarkDuplicates INPUT=${out1} OUTPUT=${out2} METRICS_FILE="${out2}.dups.log" REMOVE_DUPLICATES=true
+picard MarkDuplicates INPUT=${out1} OUTPUT=${out2} METRICS_FILE="${out2}.dups.log" REMOVE_DUPLICATES=true VALIDATION_STRINGENCY=LENIENT
 #picard MarkDuplicates INPUT=Sample_N1.sorted.bam OUTPUT=Sample_N1.sorted.nodup.bam METRICS_FILE="sample.dups.log" REMOVE_DUPLICATES=true
 # index
 samtools index $out2

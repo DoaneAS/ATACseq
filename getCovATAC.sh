@@ -35,7 +35,7 @@ Sample=${Sample%%.*}
 
 #rsync -r -v -a -z $path/$file/*.fastq ./
 
-rsync -r -v -a -z $path/$file/*.bam ./
+rsync -r -v -a -z $path/$file/*.black.bam ./
 
 #rsync -r -v -a -z $path/$file ./
 

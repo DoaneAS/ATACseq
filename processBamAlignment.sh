@@ -2,7 +2,7 @@
 # read from command line which files to align
 p1=$1
 
-BLACK="/home/asd2007/melnick_bcell_scratch/asd2007/Reference/hg19/Anshul_Hg19UltraHighSignalArtifactRegions.bed"
+BLACK="/home/asd2007/melnick_bcell_scratch/asd2007/Reference/encodeBlack.bed"
 # help
 if [ -z "$p1"  ]
 then
@@ -36,12 +36,13 @@ out2m=$(echo $out1 | sed 's/\.bam$/.nodup.noM.bam/')
 samtools idxstats $out2 | cut -f 1 | grep -v chrM | xargs samtools view -b $out2 > $out2m
 
 
-
+#something odd happening
 out2mb=$(echo $out1 | sed 's/\.bam$/.no.black.bam/')
 bedtools subtract -A -a $out2m -b $BLACK > $out2mb
 # Remove multimapping and improper reads
+
 out3=$(echo $out1 | sed 's/\.bam$/.nodup.noM.black.bam/')
-samtools view -q 20 -F 1804 -b ${out2mb} > ${out3}
+samtools view -F 1804 -b ${out2mb} > ${out3}
 samtools index $out3
 
 

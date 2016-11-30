@@ -1,20 +1,21 @@
 #!/bin/bash -l
-#$ -N AtacSeq
+#$ -N ATACseq
 #$ -j y
 #$ -m a
 #$ -cwd
 #$ -l zenodotus=true
 #$ -l os=rhel6.3
 #$ -M ashley.doane@gmail.com
-#$ -l h_rt=47:50:00
-#$ -pe smp 8
-#$ -l h_vmem=12G
+#$ -l h_rt=43:00:00
+#$ -pe smp 4
+#$ -l h_vmem=10G
 #$ -R y
 
+
 ########### SETTINGS ###########
-TRIM=1 # must be set to 1
+TRIM=0 # must be set to 1
 NUC=0
-BT2ALN=1 # bt2 recommnded!
+BT2ALN=0 # bt2 recommnded!
 ##############################
 
 
@@ -44,6 +45,9 @@ Sample=${Sample%%.*}
 
 rsync -r -v -a -z $path/$file/*.gz ./
 
+
+rsync -r -v -a -z $path/$file/* ./
+
 rsync -r -v -a -z $path/$file/*.sra ./
 #rsync -r -v -a -z $path/$file/ ./
 #rsync -r -v -a -z $path/$file/ ./
@@ -68,7 +72,7 @@ then
 	REFbt2="/zenodotus/dat02/elemento_lab_scratch/oelab_scratch_scratch007/akv3001/Genomes/Homo_sapiens/UCSC/hg19/Sequence/Bowtie2Index"
    # REFbt="/home/asd20i07/dat02/asd2007/Reference/Homo_sapiens/UCSC/mm10/Sequence/BowtieIndex/genome"
     BLACK="/home/asd2007/dat02/asd2007/Reference/encodeBlack.bed"
-    BLACK="/home/asd2007/melnick_bcell_scratch/asd2007/Reference/hg19/Anshul_Hg19UltraHighSignalArtifactRegions.bed"
+    #BLACK="/home/asd2007/melnick_bcell_scratch/asd2007/Reference/hg19/Anshul_Hg19UltraHighSignalArtifactRegions.bed"
     chrsz="/home/asd2007/melnick_bcell_scratch/asd2007/Reference/hg19.genome.chrom.sizes"
     RG="hg19"
     REFGen="/home/asd2007/melnick_bcell_scratch/asd2007/bin/bcbio/genomes/Hsapiens/hg19/seq/"
@@ -108,9 +112,10 @@ then
     trimAdapters.py -a ${Sample}.R1.fastq.gz -b ${Sample}.R2.fastq.gz
    echo "completed trimming"
 else
-    echo "will not perform adapter sequence trimming of reads, exiting pipeline"
-    mv ${Sample}.R1.fastq.gz $TMPDIR/${Sample}.R1.trim.fastq
-    mv ${Sample}.R2.fastq.gz $TMPDIR/${Sample}.R2.trim.fastq
+    echo "will not perform adapter sequence trimming of reads"
+    gunzip *.gz
+    mv ${Sample}.R1.fastq $TMPDIR/${Sample}.R1.trim.fastq
+    mv ${Sample}.R2.fastq $TMPDIR/${Sample}.R2.trim.fastq
     # mv $TMPDIR/R2/${Sample}.R2.fastq $TMPDIR/R2/${Sample}.R2.trim.fastq
    # mv $TMPDIR/R1/${Sample}.R1.fastq $TMPDIR/R1/${Sample}.R1.trim.fastq
 fi
@@ -123,15 +128,15 @@ fi
 if [ $BT2ALN == 1 ]
 then
     echo "----------bowtie2 aligning-------------"
-    bowtie2 -k 4 -X2000 --threads ${NSLOTS} -x $TMPDIR/Bowtie2Index/genome  \
+    bowtie2 -X 2000 --threads ${NSLOTS} -x $TMPDIR/Bowtie2Index/genome  \
         -1 $TMPDIR/${Sample}.R1.trim.fastq -2 $TMPDIR/${Sample}.R2.trim.fastq | \
         samtools view -bS - > $TMPDIR/${Sample}/${Sample}.bam
    # samtools sort  $TMPDIR/${Sample}.bam -o $TMPDIR/${Sample}/${Sample}.sorted.bam
     #cp $TMPDIR/${Sample}/${Sample}.sorted.bam  $TMPDIR/${Sample}/${Sample}.bt2.sorted.bam``
 else
     echo "----------bwa-mem aligning-------------"
-    echo "aligning : $TMPDIR/${Sample}.R1.trim.fq ,  $TMPDIR/${Sample}.R2.trim.fq using bwa-mem.."
-    bwa mem -t ${NSLOTS} -M $TMPDIR/BWAIndex/genome.fa $TMPDIR/${Sample}.R1.trim.fastq $TMPDIR/${Sample}.R2.trim.fastq | samtools view -bS - >  $TMPDIR/${Sample}.bam
+   # echo "aligning : $TMPDIR/${Sample}.R1.trim.fq ,  $TMPDIR/${Sample}.R2.trim.fq using bwa-mem.."
+   # bwa mem -t ${NSLOTS} -M $TMPDIR/BWAIndex/genome.fa $TMPDIR/${Sample}.R1.trim.fastq $TMPDIR/${Sample}.R2.trim.fastq | samtools view -bS - >  $TMPDIR/${Sample}.bam
 fi
 
 echo "----------Processing alignment and filtering for duplicates and mitochondrial mapping reads-----------------"
@@ -144,11 +149,11 @@ echo "--------------------------Tn5 adjusted bedfile for MACS2 peak calling-----
 
 samtools fixmate $TMPDIR/${Sample}/${Sample}.nsorted.nodup.noM.black.bam $TMPDIR/${Sample}/${Sample}.nsorted.fixmate.nodup.noM.black.bam
 
-convertBamtoBed.sh $TMPDIR/${Sample}/${Sample}.nsorted.fixmate.nodup.noM.black.bam
+convertBAMtoBED.sh $TMPDIR/${Sample}/${Sample}.nsorted.fixmate.nodup.noM.black.bam
 
 samtools view -H $TMPDIR/${Sample}/${Sample}.sorted.nodup.noM.bam | grep chr | grep -v chrM | /home/ole2001/PERL_SCRIPTS/columns.pl 1 2 | sed 's/SN://' | sed 's/LN://' > chrom.sizes
-#
-$TMPDIR/${Sample}/${Sample}.nsorted.fixmate.nodup.noM.black.bam
+
+#TMPDIR/${Sample}/${Sample}.nsorted.fixmate.nodup.noM.black.bam
 
 echo "------------------------------------------Call Peaks with MACS2--------------------------------------------"
 
@@ -201,30 +206,44 @@ rm -f ${prefix}_fc_srt.bdg ${prefix}_fc.bdg
 
 echo "----------- compute QC stats  ------------------"
 
-mkdir ${Sample}/QCmetrics
+mkdir -p ${Sample}/QCmetrics
 
-mkdir ${Sample}/QCmetrics/raw
+mkdir -p ${Sample}/QCmetrics/raw
 
-mkdir ${Sample}/QCmetrics/filtered
+mkdir -p ${Sample}/QCmetrics/filtered
 
 rsync -av /home/asd2007/Scripts/picardmetrics.conf ./
 
+
+pyatac sizes --bam $TMPDIR/${Sample}/${Sample}.sorted.nodup.noM.black.bam --upper 1000 --out $TMPDIR/${Sample}/QCmetrics/filtered
+
+
 picardmetrics run -o $TMPDIR/${Sample}/QCmetrics/raw $TMPDIR/${Sample}/${Sample}.sorted.bam
 
-picardmetrics run -o $TMPDIR/${Sample}/QCmetrics/filterred $TMPDIR/${Sample}/${Sample}.sorted.nodup.noM.black.bam
+picardmetrics run -o $TMPDIR/${Sample}/QCmetrics/filtered $TMPDIR/${Sample}/${Sample}.sorted.nodup.noM.black.bam
+
+samtools flagstat  $TMPDIR/${Sample}/${Sample}.sorted.bam > $TMPDIR/${Sample}/QCmetrics/raw/${Sample}.sorted.flagstat.txt
+
+samtools flagstat $TMPDIR/${Sample}/${Sample}.sorted.nodup.noM.bam > $TMPDIR/${Sample}/QCmetrics/filtered/${Sample}.sorted.nodup.noM.flagstat.txt
+
+getchrM $TMPDIR/${Sample}/${Sample}.sorted.nodup.noM.black.bam > $TMPDIR/${Sample/}QCmetrics/${Sample}.sorted.nodup.noM.black.bam.chrM.txt
+
+
+getchrM $TMPDIR/${Sample}/${Sample}.sorted.bam > $TMPDIR/$Sample}/QCmetrics/${Sample}.sorted.bam.chrM.txt
+
 
 echo "----------- compute fragment midpoint coverage per bp ------------------"
 #pyatac cov --bam $TMPDIR/${Sample}/${Sample}.sorted.nodup.noM.black.bam --out $TMPDIR/${Sample}/${Sample}.pyatac.cov --cores ${NSLOTS}
 
 #pyatac cov --bam $TMPDIR/${Sample}/${Sample}.sorted.nodup.noM.black.bam --out $TMPDIR/${Sample}/${Sample}.pyatac.125bp.cov --cores ${NSLOTS} --upper 125
 
-bamCoverage --bam $TMPDIR/${Sample}/${Sample}.sorted.nodup.noM.black.bam --binSize 5 \
+bamCoverage --bam $TMPDIR/${Sample}/${Sample}.sorted.nodup.noM.bam --binSize 5 \
     --outFileFormat bigwig --smoothLength 150 \
     --normalizeUsingRPKM \
     -o $TMPDIR/${Sample}/${Sample}.smooth151.center.extend.fpkm.bw --centerReads --extendReads --numberOfProcessors ${NSLOTS}
 
 
-bamCoverage --bam $TMPDIR/${Sample}/${Sample}.sorted.nodup.noM.black.bam --binSize 20 \
+bamCoverage --bam $TMPDIR/${Sample}/${Sample}.sorted.nodup.noM.bam --binSize 20 \
     --outFileFormat bigwig --smoothLength 150 \
     --normalizeUsingRPKM \
     -o $TMPDIR/${Sample}/${Sample}.bin20.smooth150.fpkm.bw --numberOfProcessors ${NSLOTS}
@@ -232,6 +251,66 @@ bamCoverage --bam $TMPDIR/${Sample}/${Sample}.sorted.nodup.noM.black.bam --binSi
 rsync -avP $TMPDIR/${Sample} $path/${Sample}
 rsync -r -a -v $TMPDIR/${Sample} $path/${Sample}
 
+
+
+
+
+BED="/home/asd2007/dat02/asd2007/Projects/DataSets/atacData/cellAtlas/cellAtlas.complete.bed"
+
+
+
+pyatac counts --bam  $TMPDIR/${Sample}/${Sample}.sorted.nodup.noM.bam --bed ${BED} --out $TMPDIR/${Sample}/${Sample}.ins
+#bedtools multicov -split -bams $BAMS -bed $BED
+
+LIBS=$(zcat ${Sample}/${Sample}.ins.counts.txt.gz  | awk '{sum +=$1} END  {printf sum}')
+
+let KM=2000000 #1 million * bin size in kb
+let LIBZ=$LIBS/$KM
+
+
+
+bamCoverage --bam  $TMPDIR/${Sample}/${Sample}.sorted.nodup.noM.bam --binSize 20 \
+    --outFileFormat bigwig --smoothLength 150  \
+    --scaleFactor $LIBZ \
+    -o ${TMPDIR}/${Sample}/$Sample.readsInPeaks.bin20.centered.smooth.150.max150f.bw --numberOfProcessors ${NSLOTS} \
+    --maxFragmentLength 150 \
+    --centerReads --extendReads
+
+
+
+bamCoverage --bam ${TMPDIR}/${Sample}/${Sample}.sorted.nodup.noM.bam --binSize 20 \
+    --outFileFormat bigwig --smoothLength 150  \
+    --scaleFactor $LIBZ \
+    -o ${TMPDIR}/$Sample/$Sample.readsInPeaks.bin20.centered.smooth.150.max500f.bw --numberOfProcessors ${NSLOTS} \
+    --maxFragmentLength 500 \
+    --centerReads --extendReads
+
+
+let KM=500000 #1 million * bin size in kb
+let LIBZ=$LIBS/$KM
+
+bamCoverage --bam ${TMPDIR}/${Sample}/${Sample}.sorted.nodup.noM.bam --binSize 5 \
+    --outFileFormat bigwig --smoothLength 150  \
+    --scaleFactor $LIBZ \
+    -o ${TMPDIR}/$Sample/$Sample.readsInPeaks.bin5.centered.smooth.150.bw --numberOfProcessors ${NSLOTS} \
+    --maxFragmentLength 150 \
+    --centerReads --extendReads
+
+
+bamCoverage --bam ${TMPDIR}/$Sample/${Sample}.sorted.nodup.noM.bam --binSize 5 \
+    --outFileFormat bigwig --smoothLength 150  \
+    --scaleFactor $LIBZ \
+    -o ${TMPDIR}/$Sample/$Sample.readsInPeaks.bin5.centered.smooth.150.max500.bw --numberOfProcessors ${NSLOTS} \
+    --maxFragmentLength 500 \
+    --centerReads --extendReads
+    #pyatac ins --bam $bam --bed $bed --
+
+rsync -avP $TMPDIR/${Sample} $path/${Sample}
+rsync -r -a -v $TMPDIR/${Sample} $path/${Sample}
+
+#path="/zenodotus/dat02/elemento_lab_scratch/oelab_scratch_scratch007/akv3001/Jon_bwa_mm10_output"
+
+#rsync -r -v $TMPDIR/${Sample}* /zenodotus/dat01/melnick_bcell_scratch/asd2007/COVERAGE/ATAC/test/peaksNorm/
 
 if [ NUC == 1 ]
 then

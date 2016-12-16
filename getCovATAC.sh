@@ -7,7 +7,7 @@
 #$ -l zenodotus=true
 #$ -l os=rhel6.3
 #$ -l h_rt=3:50:00
-#$ -pe smp 8-12
+#$ -pe smp 8-32
 #$ -l h_vmem=12G
 #$ -R y
 
@@ -15,6 +15,7 @@
 path=$1
 
 file=$(ls ${path} | tail -n +${SGE_TASK_ID}| head -1)
+
 
 #change directory to node directory
 cd $TMPDIR
@@ -35,7 +36,7 @@ Sample=${Sample%%.*}
 
 #rsync -r -v -a -z $path/$file/*.fastq ./
 
-rsync -r -v -a -z $path/$file/*.black.bam ./
+rsync -r -v -a -z $path/$file/${Sample}/*.sorted.nodup.noM.black.bam ./
 
 #rsync -r -v -a -z $path/$file ./
 
@@ -149,7 +150,7 @@ bamCoverage --bam ${TMPDIR}/${Sample}.bam --binSize 5 \
 
 #path="/zenodotus/dat02/elemento_lab_scratch/oelab_scratch_scratch007/akv3001/Jon_bwa_mm10_output"
 
-rsync -r -v $TMPDIR/${Sample}* /zenodotus/dat01/melnick_bcell_scratch/asd2007/COVERAGE/ATAC/test/peaksNorm/
+rsync -r -v $TMPDIR/${Sample}* /zenodotus/dat01/melnick_bcell_scratch/asd2007/COVERAGE/AWS.OE/BCell_Hub/hg19/atacEC3986/
 
 
 

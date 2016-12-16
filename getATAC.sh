@@ -7,14 +7,14 @@
 #$ -l os=rhel6.3
 #$ -M ashley.doane@gmail.com
 #$ -l h_rt=43:00:00
-#$ -pe smp 4
+#$ -pe smp 12-24
 #$ -l h_vmem=10G
 #$ -R y
 
 
 ########### SETTINGS ###########
-TRIM=0 # must be set to 1
-NUC=0
+TRIM=0 # 
+NUC=1 # run nucleoatac, extended runtime required
 BT2ALN=0 # bt2 recommnded!
 ##############################
 
@@ -163,7 +163,10 @@ echo "------------------------------------------Call Peaks with MACS2-----------
 #macs2 callpeak -t <(${adjustedBed}) -f BED -n $TMPDIR/${Sample}/${Sample}.broad -g 2.7e9 -p 1e-3 --nomodel --shift 75 -B --SPMR --broad --keep-dup all
 
 
-macs2 callpeak -t  $TMPDIR/${Sample}/${Sample}.nsorted.fixmate.nodup.noM.black.Tn5.tagAlign.gz -f BED -n $TMPDIR/${Sample}/${Sample}.tag.narrow -g hs  --nomodel --shift -75 --extsize 150 --keep-dup all --call-summits -p 1e-3
+macs2 callpeak -t  $TMPDIR/${Sample}/${Sample}.nsorted.fixmate.nodup.noM.black.Tn5.tagAlign.gz -f BED -n $TMPDIR/${Sample}/${Sample}.tag.narrow -g hs  --nomodel --shift -75 --extsize 150 --keep-dup all --bdg --call-summits -p 1e-3
+
+macs2 callpeak -t  $TMPDIR/${Sample}/${Sample}.nsorted.fixmate.nodup.noM.black.Tn5.tagAlign.gz -f BED -n $TMPDIR/${Sample}/${Sample}.tag.broad -g hs  --nomodel --shift -75 --extsize 150 --keep-dup all --broad --broad-cutoff 0.1
+
 
 macs2 callpeak -t  $TMPDIR/${Sample}/${Sample}.nsorted.fixmate.nodup.noM.black.bedpe.gz -f BEDPE -n $TMPDIR/${Sample}/${Sample}.bedpe.narrow -g hs  --nomodel --shift -75 --extsize 150 --keep-dup all --call-summits -p 1e-3
 
@@ -237,16 +240,16 @@ echo "----------- compute fragment midpoint coverage per bp ------------------"
 
 #pyatac cov --bam $TMPDIR/${Sample}/${Sample}.sorted.nodup.noM.black.bam --out $TMPDIR/${Sample}/${Sample}.pyatac.125bp.cov --cores ${NSLOTS} --upper 125
 
-bamCoverage --bam $TMPDIR/${Sample}/${Sample}.sorted.nodup.noM.bam --binSize 5 \
-    --outFileFormat bigwig --smoothLength 150 \
-    --normalizeUsingRPKM \
-    -o $TMPDIR/${Sample}/${Sample}.smooth151.center.extend.fpkm.bw --centerReads --extendReads --numberOfProcessors ${NSLOTS}
+#bamCoverage --bam $TMPDIR/${Sample}/${Sample}.sorted.nodup.noM.black.bam --binSize 5 \
+#    --outFileFormat bigwig --smoothLength 150 \
+#    --normalizeUsingRPKM \
+#    -o $TMPDIR/${Sample}/${Sample}.smooth151.center.extend.fpkm.bw --centerReads --extendReads --numberOfProcessors ${NSLOTS}
 
 
-bamCoverage --bam $TMPDIR/${Sample}/${Sample}.sorted.nodup.noM.bam --binSize 20 \
-    --outFileFormat bigwig --smoothLength 150 \
-    --normalizeUsingRPKM \
-    -o $TMPDIR/${Sample}/${Sample}.bin20.smooth150.fpkm.bw --numberOfProcessors ${NSLOTS}
+#bamCoverage --bam $TMPDIR/${Sample}/${Sample}.sorted.nodup.noM.black.bam --binSize 20 \
+#    --outFileFormat bigwig --smoothLength 150 \
+#    --normalizeUsingRPKM \
+#    -o $TMPDIR/${Sample}/${Sample}.bin20.smooth150.fpkm.bw --numberOfProcessors ${NSLOTS}
 
 rsync -avP $TMPDIR/${Sample} $path/${Sample}
 rsync -r -a -v $TMPDIR/${Sample} $path/${Sample}
@@ -255,11 +258,11 @@ rsync -r -a -v $TMPDIR/${Sample} $path/${Sample}
 
 
 
-BED="/home/asd2007/dat02/asd2007/Projects/DataSets/atacData/cellAtlas/cellAtlas.complete.bed"
+BED="/home/asd2007/dat02/asd2007/Projects/DataSets/atacData/ATAC-AML/AML/cellAtlas.bed"
 
 
 
-pyatac counts --bam  $TMPDIR/${Sample}/${Sample}.sorted.nodup.noM.bam --bed ${BED} --out $TMPDIR/${Sample}/${Sample}.ins
+pyatac counts --bam  $TMPDIR/${Sample}/${Sample}.sorted.nodup.noM.black.bam --bed ${BED} --out $TMPDIR/${Sample}/${Sample}.ins
 #bedtools multicov -split -bams $BAMS -bed $BED
 
 LIBS=$(zcat ${Sample}/${Sample}.ins.counts.txt.gz  | awk '{sum +=$1} END  {printf sum}')
@@ -269,7 +272,7 @@ let LIBZ=$LIBS/$KM
 
 
 
-bamCoverage --bam  $TMPDIR/${Sample}/${Sample}.sorted.nodup.noM.bam --binSize 20 \
+bamCoverage --bam  $TMPDIR/${Sample}/${Sample}.sorted.nodup.noM.black.bam --binSize 20 \
     --outFileFormat bigwig --smoothLength 150  \
     --scaleFactor $LIBZ \
     -o ${TMPDIR}/${Sample}/$Sample.readsInPeaks.bin20.centered.smooth.150.max150f.bw --numberOfProcessors ${NSLOTS} \
@@ -278,18 +281,18 @@ bamCoverage --bam  $TMPDIR/${Sample}/${Sample}.sorted.nodup.noM.bam --binSize 20
 
 
 
-bamCoverage --bam ${TMPDIR}/${Sample}/${Sample}.sorted.nodup.noM.bam --binSize 20 \
-    --outFileFormat bigwig --smoothLength 150  \
-    --scaleFactor $LIBZ \
-    -o ${TMPDIR}/$Sample/$Sample.readsInPeaks.bin20.centered.smooth.150.max500f.bw --numberOfProcessors ${NSLOTS} \
-    --maxFragmentLength 500 \
-    --centerReads --extendReads
+#bamCoverage --bam ${TMPDIR}/${Sample}/${Sample}.sorted.nodup.noM.black.bam --binSize 20 \
+#    --outFileFormat bigwig --smoothLength 150  \
+#    --scaleFactor $LIBZ \
+#    -o ${TMPDIR}/$Sample/$Sample.readsInPeaks.bin20.centered.smooth.150.max500f.bw --numberOfProcessors ${NSLOTS} \
+#    --maxFragmentLength 500 \
+#    --centerReads --extendReads
 
 
 let KM=500000 #1 million * bin size in kb
 let LIBZ=$LIBS/$KM
 
-bamCoverage --bam ${TMPDIR}/${Sample}/${Sample}.sorted.nodup.noM.bam --binSize 5 \
+bamCoverage --bam ${TMPDIR}/${Sample}/${Sample}.sorted.nodup.noM.black.bam --binSize 5 \
     --outFileFormat bigwig --smoothLength 150  \
     --scaleFactor $LIBZ \
     -o ${TMPDIR}/$Sample/$Sample.readsInPeaks.bin5.centered.smooth.150.bw --numberOfProcessors ${NSLOTS} \
@@ -297,16 +300,19 @@ bamCoverage --bam ${TMPDIR}/${Sample}/${Sample}.sorted.nodup.noM.bam --binSize 5
     --centerReads --extendReads
 
 
-bamCoverage --bam ${TMPDIR}/$Sample/${Sample}.sorted.nodup.noM.bam --binSize 5 \
-    --outFileFormat bigwig --smoothLength 150  \
-    --scaleFactor $LIBZ \
-    -o ${TMPDIR}/$Sample/$Sample.readsInPeaks.bin5.centered.smooth.150.max500.bw --numberOfProcessors ${NSLOTS} \
-    --maxFragmentLength 500 \
-    --centerReads --extendReads
+#bamCoverage --bam ${TMPDIR}/$Sample/${Sample}.sorted.nodup.noM.black.bam --binSize 5 \
+#    --outFileFormat bigwig --smoothLength 150  \
+#    --scaleFactor $LIBZ \
+#    -o ${TMPDIR}/$Sample/$Sample.readsInPeaks.bin5.centered.smooth.150.max500.bw --numberOfProcessors ${NSLOTS} \
+#    --maxFragmentLength 500 \
+#    --centerReads --extendReads
     #pyatac ins --bam $bam --bed $bed --
 
 rsync -avP $TMPDIR/${Sample} $path/${Sample}
 rsync -r -a -v $TMPDIR/${Sample} $path/${Sample}
+
+
+rsync -r -a -v $TMPDIR/${Sample}/*.bw  /home/asd2007/melnick_bcell_scratch/asd2007/COVERAGE/AWS.OE/BCell_Hub/hg19/atacEC3986/
 
 #path="/zenodotus/dat02/elemento_lab_scratch/oelab_scratch_scratch007/akv3001/Jon_bwa_mm10_output"
 
@@ -318,7 +324,8 @@ then
     bedtools slop -i $TMPDIR/${Sample}/${Sample}.broad.broadPeak -g ${chrsz} -b 1000 > $TMPDIR/${Sample}/${Sample}.slop1k.bed
  ## save to run on pooled samples
  ## high resolution 1bp bin insertion density
-    pyatac ins --bam $TMPDIR/${Sample}/${Sample}.sorted.nodup.noM.black.bam --out $TMPDIR/${Sample}/${Sample}.ins.smooth --smooth 151 --cores ${NSLOTS}
+   
+    #pyatac ins --bam $TMPDIR/${Sample}/${Sample}.sorted.nodup.noM.black.bam --out $TMPDIR/${Sample}/${Sample}.ins.smooth --smooth 151 --cores ${NSLOTS}
 
 #
     #REF="/zenodotus/dat02/elemento_lab_scratch/oelab_scratch_scratch007/akv3001/Genomes/Homo_sapiens/UCSC/mm10/Sequence/BWAIndex/genome.fa"
@@ -332,7 +339,7 @@ then
     ## additional tracks
     #igvtools toTDF -z 10 $TMPDIR/${Sample}/${Sample}.ins.smooth.ins.bedgraph.gz $TMPDIR/${Sample}/${Sample}.ins.smooth.ins.tdf $RG
     mv $TMPDIR/${Sample}/${Sample}.ins.smooth.ins.bedgraph.gz $TMPDIR/${Sample}/${Sample}.ins.smooth.ins.bdg.gz
-    #gunzip $TMPDIR/${Sample}/${Sample}.ins.smooth.ins.bdg.gz
+    gunzip $TMPDIR/${Sample}/${Sample}.ins.smooth.ins.bdg.gz
     ~/SHELL_SCRIPTS/bdg2bw $TMPDIR/${Sample}/${Sample}.ins.smooth.ins.bdg $chrsz
     mv $TMPDIR/${Sample}/${Sample}.nucleoatac_signal.smooth.bedgraph.gz $TMPDIR/${Sample}/${Sample}.nucleoatac_signal.smooth.bdg.gz
     gunzip $TMPDIR/${Sample}/${Sample}.nucleoatac_signal.smooth.bdg.gz
@@ -343,5 +350,8 @@ then
     rsync -r -a -v $TMPDIR/${Sample} $path/${Sample}
 else
     echo "---- no NucleoATAC------------------------------"
+
+    rsync -avP $TMPDIR/${Sample} $path/${Sample}
+    rsync -r -a -v $TMPDIR/${Sample} $path/${Sample}
 fi
 

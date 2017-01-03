@@ -12,7 +12,7 @@ then
     exit
 fi
 
-   # convert to bam and sort
+# convert to bam and sort
 echo "Sorting..."
 out1prefix=$(echo $p1 | sed 's/\.bam$//')
 out1="${out1prefix}.sorted.bam"
@@ -51,4 +51,4 @@ samtools index $out3
 for w in 1000 500 200
 do
     picard CollectInsertSizeMetrics I=$out3 O="${out3}.window${w}.hist_data" H="${out3}.window${w}.hist_graph.pdf" W=${w}
-done
+    done

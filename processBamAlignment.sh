@@ -1,6 +1,7 @@
 #!/bin/bash
 
-# read from command line which files to align
+# read from command line the unfiltered and unsortde bam file
+
 p1=$1
 
 BLACK="/home/asd2007/melnick_bcell_scratch/asd2007/Reference/encodeBlack.bed"
@@ -12,6 +13,35 @@ then
     echo "<samFile>: Required bam input file"
     exit
 fi
+
+#SUB=$2
+#if [ $SUB == 1 ]#
+#then
+    # convert to bam and sort
+ #   echo "Sorting..."
+   # out1prefix=$(echo ${p1} | sed 's/\.bam$//')
+   # out1="${out1prefix}.sorted.bam"
+  #  echo ${out1}
+  #  samtools view -s 0.01 -S -u $p1 | samtools sort - > ${out1}
+    #index
+ #   samtools index $out1
+    # samtools sort  $TMPDIR/${Sample}.bam -o $TMPDIR/${Sample}/${Sample}.sorted.bam
+    #cp $TMPDIR/${Sample}/${Sample}.sorted.bam  $TMPDIR/${Sample}/${Sample}.bt2.sorted.bam``
+#else
+
+    echo "Sorting..."
+    out1prefix=$(echo $p1 | sed 's/\.bam$//')
+    out1="${out1prefix}.sorted.bam"
+    echo ${out1}
+    samtools view -S -u $p1 | samtools sort - > ${out1}
+    #index
+    samtools index $out1
+    # echo "aligning : $TMPDIR/${Sample}.R1.trim.fq ,  $TMPDIR/${Sample}.R2.trim.fq using bwa-mem.."
+    # bwa mem -t ${NSLOTS} -M $TMPDIR/BWAIndex/genome.fa $TMPDIR/${Sample}.R1.trim.fastq $TMPDIR/${Sample}.R2.trim.fastq | samtools view -bS - >  $TMPDIR/${Sample}.bam
+#fi
+
+
+
 
 # convert to bam and sort
 echo "Sorting..."
@@ -57,15 +87,16 @@ do
 
 
 
-samtools fixmate -r ${out1} ${out1prefix}.fixmate.tmp
-samtools view -F 1804 -f 2 -u ${out1prefix}.fixmate.tmp | samtools sort - ${out1prefix}.filt.srt
+samtools sort -n $p1 -o ${out1prefix}.nsort.bam
+samtools fixmate -r ${out1prefix}.nsort.bam ${out1prefix}.nsort.fixmate.bam
+samtools view -F 1804 -f 2 -u  ${out1prefix}.nsort.fixmate.bam | samtools sort - > ${out1prefix}.filt.srt.bam
 
 
 picard MarkDuplicates INPUT=${out1prefix}.filt.srt.bam OUTPUT=${out1prefix}.dupmark.bam METRICS_FILE=${out1prefix}.dup.qc VALIDATION_STRINGENCY=LENIENT ASSUME_SORTED=true REMOVE_DUPLICATES=false
 
-samtools sort -n ${out1prefix}.dupmark.bam ${out1prefix}.srt.tmp
+samtools sort -n ${out1prefix}.dupmark.bam -o ${out1prefix}.srt.tmp.bam
 
-dupmark_bam="${out1prefix}.srt.tmp.bam"
+dupmark_bam="${out1prefix}.srt.tmp.bam" 
 
 PBC_QC="${out1prefix}.pbc.qc"
 

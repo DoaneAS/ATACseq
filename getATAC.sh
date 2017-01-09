@@ -119,8 +119,8 @@ then
     cat *R2* >  ${Sample}.R2.fastq.gz
     trimAdapters.py -a ${Sample}.R1.fastq.gz -b ${Sample}.R2.fastq.gz
     echo "completed trimming"
-    gzip --rsyncable -c $TMPDIR/${Sample}.R1.trim.fastq > $TMPDIR/${Sample}.R1.trim.fastq.gz
-    gzip --rsyncable -c $TMPDIR/${Sample}.R2.trim.fastq > $TMPDIR/${Sample}.R2.trim.fastq.gz
+    pigz -p $NSLOTS -c $TMPDIR/${Sample}.R1.trim.fastq > $TMPDIR/${Sample}.R1.trim.fastq.gz
+    pigz -p $NSLOTS -c $TMPDIR/${Sample}.R2.trim.fastq > $TMPDIR/${Sample}.R2.trim.fastq.gz
     rsync -av $TMPDIR/${Sample}.R*.trim.fastq.gz ${path}/${Sample}
 else
     echo "will not perform adapter sequence trimming of reads"

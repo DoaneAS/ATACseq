@@ -119,7 +119,9 @@ then
     cat *R2* >  ${Sample}.R2.fastq.gz
     trimAdapters.py -a ${Sample}.R1.fastq.gz -b ${Sample}.R2.fastq.gz
     echo "completed trimming"
-    rsync -avP $TMPDIR/${Sample}.R*.trim.fastq ${path}/${Sample}
+    gzip --rsyncable -c $TMPDIR/${Sample}.R1.trim.fastq > $TMPDIR/${Sample}.R1.trim.fastq.gz
+    gzip --rsyncable -c $TMPDIR/${Sample}.R2.trim.fastq > $TMPDIR/${Sample}.R2.trim.fastq.gz
+    rsync -av $TMPDIR/${Sample}.R*.trim.fastq.gz ${path}/${Sample}
 else
     echo "will not perform adapter sequence trimming of reads"
     #gunzip *.gz
@@ -138,7 +140,7 @@ if [ $BT2ALN == 1 ]
 then
     echo "----------bowtie2 aligning-------------"
     bowtie2 -X 2000 --threads ${NSLOTS} -x $TMPDIR/Bowtie2Index/genome  \
-        -1 $TMPDIR/${Sample}.R1.trim.fastq -2 $TMPDIR/${Sample}.R2.trim.fastq | \
+            -1 $TMPDIR/${Sample}.R1.trim.fastq -2 $TMPDIR/${Sample}.R2.trim.fastq 2> ${Sample}/${Sample}.bt2.log| \
         samtools view -bS - > $TMPDIR/${Sample}/${Sample}.bam
    # samtools sort  $TMPDIR/${Sample}.bam -o $TMPDIR/${Sample}/${Sample}.sorted.bam
     #cp $TMPDIR/${Sample}/${Sample}.sorted.bam  $TMPDIR/${Sample}/${Sample}.bt2.sorted.bam``
@@ -333,6 +335,57 @@ rsync -r -a -v $TMPDIR/${Sample}/*.bw  /home/asd2007/melnick_bcell_scratch/asd20
 #path="/zenodotus/dat02/elemento_lab_scratch/oelab_scratch_scratch007/akv3001/Jon_bwa_mm10_output"
 
 #rsync -r -v $TMPDIR/${Sample}* /zenodotus/dat01/melnick_bcell_scratch/asd2007/COVERAGE/ATAC/test/peaksNorm/
+
+
+
+
+
+WORKDIR="$TMPDIR/${Sample}"
+OUTDIR="${WORKDIR}/QCmetrics/atacqc"
+OUTPREFIX="${Sample}"
+INPREFIX="$Sample"
+GENOME='hg19' # This is the only genome that currently works
+
+SAMPLE="$Sample"
+# Annotation files
+ANNOTDIR="/home/asd2007/melnick_bcell_scratch/asd2007/Reference"
+X="/home/asd2007/melnick_bcell_scratch/asd2007/Reference/hg19/"
+DNASE_BED="${ANNOTDIR}/${GENOME}/reg2map_honeybadger2_dnase_all_p10_ucsc.bed.gz"
+BLACKLIST_BED="${ANNOTDIR}/${GENOME}/Anshul_Hg19UltraHighSignalArtifactRegions.bed.gz"
+TSS_BED="${ANNOTDIR}/${GENOME}/hg19_RefSeq_stranded.bed.gz"
+REF_FASTA="${ANNOTDIR}/${GENOME}/encodeHg19Male.fa"
+PROM="${ANNOTDIR}/${GENOME}/reg2map_honeybadger2_dnase_prom_p2.bed.gz"
+ENH="${ANNOTDIR}/${GENOME}/reg2map_honeybadger2_dnase_enh_p2.bed.gz"
+REG2MAP="${ANNOTDIR}/${GENOME}/dnase_avgs_reg2map_p10_merged_named.pvals.gz"
+ROADMAP_META="${ANNOTDIR}/${GENOME}/eid_to_mnemonic.txt"
+
+python $HOME/dat02/asd2007/TOOLS/ataqc/run_ataqc.py \
+                    --workdir $WORKDIR \
+                    --outdir $OUTDIR \
+                    --outprefix $OUTPREFIX \
+                    --genome $GENOME \
+                    --ref $REF_FASTA \
+                    --tss $TSS_BED \
+                    --dnase $DNASE_BED \
+                    --blacklist $BLACKLIST_BED \
+                    --prom $PROM \
+                    --enh $ENH \
+                    --reg2map $REG2MAP \
+                    --meta $ROADMAP_META \
+                    --inprefix $INPREFIX \
+                    --finalbam $SAMPLE/$SAMPLE.sorted.nodup.noM.black.bam \
+                    --finalbed $SAMPLE/$SAMPLE.tag.narrow_peaks.narrowPeak \
+                    --coordsortbam $SAMPLE/$SAMPLE.sorted.nodup.noM.black.bam \
+                    --alignedbam $SAMPLE/$SAMPLE.sorted.bam \
+                    --duplog ${Sample}.dup.qc \
+                    --pbc $SAMPLE.pbc.qc \
+                    --bigwig $SAMPLE/$SAMPLE.smooth151.center.extend.fpkm.bw \
+                    --fastq1  $TMPDIR/${Sample}.R1.trim.fastq \
+                    --fastq2 $TMPDIR/${Sample}.R2.trim.fastq
+
+
+
+
 
 if [ NUC == 1 ]
 then

@@ -1,4 +1,5 @@
 #!/bin/bash
+
 # read from command line which files to align
 p1=$1
 
@@ -52,3 +53,20 @@ for w in 1000 500 200
 do
     picard CollectInsertSizeMetrics I=$out3 O="${out3}.window${w}.hist_data" H="${out3}.window${w}.hist_graph.pdf" W=${w}
     done
+
+
+
+
+samtools fixmate -r ${out1} ${out1prefix}.fixmate.tmp
+samtools view -F 1804 -f 2 -u ${out1prefix}.fixmate.tmp | samtools sort - ${out1prefix}.filt.srt
+
+
+picard MarkDuplicates INPUT=${out1prefix}.filt.srt.bam OUTPUT=${out1prefix}.dupmark.bam METRICS_FILE=${out1prefix}.dup.qc VALIDATION_STRINGENCY=LENIENT ASSUME_SORTED=true REMOVE_DUPLICATES=false
+
+samtools sort -n ${out1prefix}.dupmark.bam ${out1prefix}.srt.tmp
+
+dupmark_bam="${out1prefix}.srt.tmp.bam"
+
+PBC_QC="${out1prefix}.pbc.qc"
+
+bedtools bamtobed -bedpe -i $dupmark_bam | awk 'BEGIN{OFS="\t"}{print $1,$2,$4,$6,$9,$10}' | grep -v 'chrM' | sort | uniq -c | awk 'BEGIN{mt=0;m0=0;m1=0;m2=0} ($1==1){m1=m1+1} ($1==2){m2=m2+1} {m0=m0+1} {mt=mt+$1} END{printf "%d\t%d\t%d\t%d\t%f\t%f\t%f\n",mt,m0,m1,m2,m0/mt,m1/m0,m1/m2}' > ${PBC_QC}

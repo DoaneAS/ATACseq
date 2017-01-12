@@ -115,8 +115,12 @@ ls -lrth
 if [ $TRIM == 1 ]
 then
     echo "Trimming adapter sequences, with command..."
-    cat *R1* > ${Sample}.R1.fastq.gz
-    cat *R2* >  ${Sample}.R2.fastq.gz
+
+#    cat *_val_1.fq.gz > ${Sample}.R1.fastq.gz
+ #   cat *_val_2.fq.gz > ${Sample}.R2.fastq.gz
+    cat *_R2* >  ${Sample}.R2.fastq.gz
+    cat *_R1* > ${Sample}.R1.fastq.gz
+    #cat *R2* >  ${Sample}.R2.fastq.gz
     trimAdapters.py -a ${Sample}.R1.fastq.gz -b ${Sample}.R2.fastq.gz
     echo "completed trimming"
     pigz -p $NSLOTS -c $TMPDIR/${Sample}.R1.trim.fastq > $TMPDIR/${Sample}.R1.trim.fastq.gz

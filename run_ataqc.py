@@ -1,7 +1,7 @@
 #!/usr/bin/env python2
 
-# Daniel Kim, CS Foo
-# 2016-03-28
+# Ashley Doane, Elemento Lab
+# adapted from: Daniel Kim, CS Foo
 # Script to run ataqc, all parts
 
 import matplotlib
@@ -511,7 +511,7 @@ def get_mito_dups(sorted_bam, prefix, endedness='Paired-ended', use_sambamba=Fal
     use_sambamba to True (default False).
     '''
 
-    out_file = '{0}.dupmark.ataqc.bam'.format(prefix)
+    out_file = '{0}.dupmark.bam'.format(prefix)
     metrics_file = '{0}.dup.ataqc'.format(prefix)
 
     # Filter bam on the flag 0x002
@@ -519,7 +519,7 @@ def get_mito_dups(sorted_bam, prefix, endedness='Paired-ended', use_sambamba=Fal
     tmp_filtered_bam_prefix = tmp_filtered_bam.replace('.bam', '')
     if endedness == 'Paired-ended':
         filter_bam = ('samtools view -F 1804 -f 2 -u {0} | '
-                      'samtools sort - {1}'.format(sorted_bam, tmp_filtered_bam_prefix))
+                      'samtools sort - -o {1}'.format(sorted_bam, tmp_filtered_bam_prefix))
     else:
         filter_bam = ('samtools view -F 1804 -u {0} | '
                       'samtools sort - {1}'.format(sorted_bam, tmp_filtered_bam_prefix))
@@ -565,13 +565,14 @@ def get_mito_dups(sorted_bam, prefix, endedness='Paired-ended', use_sambamba=Fal
 
     # Clean up
     remove_bam = 'rm {0}'.format(out_file)
-    os.system(remove_bam)
+    #os.system(remove_bam)
     remove_metrics_file = 'rm {0}'.format(metrics_file)
-    os.system(remove_metrics_file)
+    #os.system(remove_metrics_file)
     remove_tmp_filtered_bam = 'rm {0}'.format(tmp_filtered_bam)
-    os.system(remove_tmp_filtered_bam)
+    #os.system(remove_tmp_filtered_bam)
 
     return mito_dups, float(mito_dups) / total_dups
+
 
 
 def get_samtools_flagstat(bam_file):
@@ -581,7 +582,7 @@ def get_samtools_flagstat(bam_file):
     logging.info('samtools flagstat...')
     results = pysam.flagstat(bam_file)
     flagstat = ''
-    for line in results:
+    for line in results.split("\n"):
         logging.info(line.strip())
         flagstat += line
         if "mapped" in line and "mate" not in line:
@@ -1250,25 +1251,48 @@ def parse_args():
     '''
     Set up the package to be run from the command line
     '''
-
     parser = argparse.ArgumentParser(description='ATAC-seq QC package')
-
     # Directories and prefixes
-    parser.add_argument('--workdir', help='Working directory')
-    parser.add_argument('--outdir', help='Output directory')
-    parser.add_argument('--outprefix', help='Output prefix')
 
+    parser.add_argument('--workdir')#default=os.path.join(os.environ.get('${PWD}', None),os.environ.get('$Sample',None )))
+    parser.add_argument('--outdir', default="qc")
+    parser.add_argument('--outprefix', help='Output prefix')# default=os.environ.get('Sample', None))
     # Annotation files
-    parser.add_argument('--genome', help='Genome build used')
-    parser.add_argument('--ref', help='Reference fasta file')
-    parser.add_argument('--tss', help='TSS file')
-    parser.add_argument('--dnase', help='Open chromatin region file')
-    parser.add_argument('--blacklist', help='Blacklisted region file')
-    parser.add_argument('--prom', help='Promoter region file')
-    parser.add_argument('--enh', help='Enhancer region file')
-    parser.add_argument('--reg2map_bed', help='file of regions used to generate reg2map signals')
-    parser.add_argument('--reg2map', help='file with cell type signals')
-    parser.add_argument('--meta', help='Roadmap metadata')
+    parser.add_argument('--genome', help='Genome build used', default="hg19")
+    parser.add_argument('--ref', help='Reference fasta file', 
+                        default="/home/asd2007/melnick_bcell_scratch/asd2007/Reference/hg19/encodeHg19Male.fa")
+    parser.add_argument('--tss', help='TSS file', default="/home/asd2007/melnick_bcell_scratch/asd2007/Reference/hg19/hg19_RefSeq_stranded.bed.gz")
+    parser.add_argument('--dnase', help='Open chromatin region file', 
+                        default="/home/asd2007/melnick_bcell_scratch/asd2007/Reference/hg19/reg2map_honeybadger2_dnase_all_p10_ucsc.bed.gz") 
+    parser.add_argument('--blacklist',  help='Blacklisted region file', default="home/asd2007/melnick_bcell_scratch/asd2007/Reference/hg19/wgEncodeDacMapabilityConsensusExcludable.bed.gz")
+    parser.add_argument('--prom', help='Promoter region file', default="/home/asd2007/melnick_bcell_scratch/asd2007/Reference/hg19/reg2map_honeybadger2_dnase_prom_p2.bed.gz")
+    parser.add_argument('--enh', help='Enhancer region file', default="/home/asd2007/melnick_bcell_scratch/asd2007/Reference/hg19/reg2map_honeybadger2_dnase_enh_p2.bed.gz ")
+    parser.add_argument('--reg2map_bed', help='file of regions used to generate reg2map signals', default="/home/asd2007/melnick_bcell_scratch/asd2007/Reference/hg19/reg2map_honeybadger2_dnase_all_p10_ucsc.bed.gz")
+    parser.add_argument('--reg2map', default="/home/asd2007/melnick_bcell_scratch/asd2007/Reference/hg19/dnase_avgs_reg2map_p10_merged_named.pvals.gz")
+    parser.add_argument('--meta', help='Roadmap metadata', default='/home/asd2007/melnick_bcell_scratch/asd2007/Reference/hg19/eid_to_mnemonic.txt')
+    
+    # Choose which mode
+   # parser.add_argument('--pipeline',
+   #                     default=None,
+   #                     help='Specific pipeline was used')
+
+
+   # # Directories and prefixes
+   # parser.add_argument('--workdir', help='Working directory')
+   # parser.add_argument('--outdir', help='Output directory')
+   # parser.add_argument('--outprefix', help='Output prefix')
+
+   # # Annotation files
+   # parser.add_argument('--genome', help='Genome build used')
+   # parser.add_argument('--ref', help='Reference fasta file')
+   # parser.add_argument('--tss', help='TSS file')
+   # parser.add_argument('--dnase', help='Open chromatin region file')
+   # parser.add_argument('--blacklist', help='Blacklisted region file')
+   # parser.add_argument('--prom', help='Promoter region file')
+   # parser.add_argument('--enh', help='Enhancer region file')
+   # parser.add_argument('--reg2map_bed', help='file of regions used to generate reg2map signals')
+   # parser.add_argument('--reg2map', help='file with cell type signals')
+   # parser.add_argument('--meta', help='Roadmap metadata')
 
     # Choose which mode
     parser.add_argument('--pipeline',
@@ -1276,9 +1300,9 @@ def parse_args():
                         help='Specific pipeline was used')
 
     # Mode 1: Provide an input prefix
-    parser.add_argument('--inprefix',
-                        default='test',
-                        help='Input file prefix')
+   # parser.add_argument('--inprefix',
+   #                     default='test',
+    #                    help='Input file prefix')
 
     # Mode 2: Define every possible QC file
     parser.add_argument('--fastq1',
@@ -1299,17 +1323,16 @@ def parse_args():
     parser.add_argument('--peaks',
                         help='Peak file')
     parser.add_argument('--naive_overlap_peaks',
-                        default=None, help='Naive overlap peak file')
-    parser.add_argument('--idr_peaks',
-                        default=None, help='IDR peak file')
+                         help='Naive overlap peak file')
+    parser.add_argument('--idr_peaks')
     parser.add_argument('--use_sambamba_markdup', action='store_true',
                         help='Use sambamba markdup instead of Picard')
 
     args = parser.parse_args()
 
     # Set up all variables
-    INPUT_PREFIX = os.path.join(args.workdir, args.inprefix)
-    OUTPUT_PREFIX = os.path.join(args.outdir, args.outprefix)
+    INPUT_PREFIX = os.path.join(args.workdir, args.outprefix)
+    OUTPUT_PREFIX = os.path.join(args.workdir, args.outprefix)
     os.system('mkdir -p {0}'.format(args.outdir))
     NAME = args.outprefix
 
@@ -1327,7 +1350,7 @@ def parse_args():
 
     # If mode 1 - TO BE DEPRECATED. In this case, the module is run with
     # Jin's pipeline
-    if args.pipeline == 'kundajelab':
+    if args.pipeline == 'elementolab':
         FASTQ = args.fastq1
         ALIGNED_BAM = '{0}.bam'.format(INPUT_PREFIX)
         ALIGNMENT_LOG = '{0}.align.log'.format(INPUT_PREFIX)
@@ -1371,8 +1394,8 @@ def main():
      NAIVE_OVERLAP_PEAKS, IDR_PEAKS, USE_SAMBAMBA_MARKDUP] = parse_args()
 
     # Set up the log file and timing
-    logging.basicConfig(filename='test.log', level=logging.DEBUG)
-    start = timeit.default_timer()
+    #logging.basicConfig(filename='test.log', level=logging.DEBUG)
+    #start = timeit.default_timer()
 
     # First check if paired/single
     paired_status = determine_paired(FINAL_BAM)
@@ -1383,9 +1406,9 @@ def main():
     # Sequencing metrics: Bowtie1/2 alignment log, chrM, GC bias
     BOWTIE_STATS = get_bowtie_stats(ALIGNMENT_LOG)
     chr_m_reads, fraction_chr_m = get_chr_m(COORDSORT_BAM)
-    gc_out, gc_plot, gc_summary = get_gc(FINAL_BAM,
-                                         REF,
-                                         OUTPUT_PREFIX)
+#    gc_out, gc_plot, gc_summary = get_gc(FINAL_BAM,
+#                                         REF,
+#                                         OUTPUT_PREFIX)
 
     # Library complexity: Preseq results, NRF, PBC1, PBC2
     picard_est_library_size = get_picard_complexity_metrics(ALIGNED_BAM,
@@ -1542,7 +1565,7 @@ def main():
         ('idr_peak_dist', idr_peak_dist),
 
         # GC
-        ('gc_bias', plot_gc(gc_out)),
+#        ('gc_bias', plot_gc(gc_out)),
 
         # Annotation based statistics
         ('enrichment_plots', ENRICHMENT_PLOTS),
@@ -1588,8 +1611,8 @@ def main():
             pass
     textfile.close()
 
-    stop = timeit.default_timer()
-    print "Run time:", str(datetime.timedelta(seconds=int(stop - start)))
+   # stop = timeit.default_timer()
+    #print "Run time:", str(datetime.timedelta(seconds=int(stop - start)))
 
     return None
 

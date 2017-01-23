@@ -15,7 +15,7 @@ o2=$(echo ${p1} | sed -r 's/\.bam$/.chipEncode.tagAlign.gz/g')
 
 o3=$(echo ${p1} | sed -r 's/\.bam$/.bedpe.gz/g')
 
-o4=$(echo ${p1} | sed -r 's/\.bam$/.Tn5.tagAlign.gz/g')
+o4=$(echo ${p1} | sed -r 's/\.bam$/.tn5.tagAlign.gz/g')
 
 
 bamToBed -i ${p1} | awk 'BEGIN{OFS="\t"} $6=="+" { $2=$2+4; $3=$3 ; $4="N" ; print $0} $6=="-"{ $2=$2; $3=$3-5; $4="N" ; print $0}' | gzip -c > ${o4}

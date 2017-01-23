@@ -62,18 +62,18 @@ picard MarkDuplicates INPUT=${out1} OUTPUT=${out2} METRICS_FILE="${out2}.dups.lo
 samtools index $out2
 
 
-out2m=$(echo $out1 | sed 's/\.bam$/.nodup.noM.bam/')
+out2m=$(echo $out1 | sed 's/\.bam$/.nodup.noM.temp.bam/')
 
 samtools idxstats $out2 | cut -f 1 | grep -v chrM | xargs samtools view -b $out2 > $out2m
 
 
 #something odd happening
 out2mb=$(echo $out1 | sed 's/\.bam$/.no.black.bam/')
-bedtools subtract -A -a $out2m -b $BLACK > $out2mb
+#bedtools subtract -A -a $out2m -b $BLACK > $out2mb
 # Remove multimapping and improper reads
 
-out3=$(echo $out1 | sed 's/\.bam$/.nodup.noM.black.bam/')
-samtools view -F 1804 -b ${out2mb} > ${out3}
+out3=$(echo $out1 | sed 's/\.bam$/.nodup.noM.bam/')
+samtools view -F 1804 -b ${out2m} > ${out3}
 samtools index $out3
 
 
@@ -86,6 +86,7 @@ do
 
 
 
+## make bam with marked dups and generate PBC file for QC
 
 samtools sort -n $p1 -o ${out1prefix}.nsort.bam
 samtools fixmate -r ${out1prefix}.nsort.bam ${out1prefix}.nsort.fixmate.bam

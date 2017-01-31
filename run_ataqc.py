@@ -260,7 +260,7 @@ def run_preseq(bam_w_dups, prefix):
                                                               preseq_log)
     logging.info(preseq)
     os.system(preseq)
-    os.system('rm {0}.sorted.bam'.format(prefix))
+    #os.system('rm {0}.sorted.bam'.format(prefix))
     return preseq_data, preseq_log
 
 
@@ -489,7 +489,6 @@ def get_sambamba_dup_stats(sambamba_dup_file, paired_status):
     logging.info('Running sambamba markdup...')
     with open(sambamba_dup_file, 'r') as fp:
         lines = fp.readlines()
-
     end_pairs = int(lines[1].strip().split()[1])
     single_ends = int(lines[2].strip().split()[1])
     ends_marked_dup = int(lines[4].strip().split()[1])
@@ -519,7 +518,7 @@ def get_mito_dups(sorted_bam, prefix, endedness='Paired-ended', use_sambamba=Fal
     tmp_filtered_bam_prefix = tmp_filtered_bam.replace('.bam', '')
     if endedness == 'Paired-ended':
         filter_bam = ('samtools view -F 1804 -f 2 -u {0} | '
-                      'samtools sort - -o {1}'.format(sorted_bam, tmp_filtered_bam_prefix))
+                      'samtools sort - -o {1}'.format(sorted_bam, tmp_filtered_bam))
     else:
         filter_bam = ('samtools view -F 1804 -u {0} | '
                       'samtools sort - {1}'.format(sorted_bam, tmp_filtered_bam_prefix))
@@ -1352,16 +1351,16 @@ def parse_args():
     # Jin's pipeline
     if args.pipeline == 'elementolab':
         FASTQ = args.fastq1
-        ALIGNED_BAM = '{0}.bam'.format(INPUT_PREFIX)
+        ALIGNED_BAM = '{0}.sorted.bam'.format(INPUT_PREFIX)
         ALIGNMENT_LOG = '{0}.align.log'.format(INPUT_PREFIX)
-        COORDSORT_BAM = '{0}.nodup.bam'.format(INPUT_PREFIX)
+        COORDSORT_BAM = '{0}.sorted.bam'.format(INPUT_PREFIX)
         DUP_LOG = '{0}.dup.qc'.format(INPUT_PREFIX)
-        PBC_LOG = '{0}.nodup.pbc.qc'.format(INPUT_PREFIX)
-        FINAL_BAM = '{0}.nodup.nonchrM.bam'.format(INPUT_PREFIX)
-        FINAL_BED = '{0}.nodup.nonchrM.tn5.bed.gz'.format(INPUT_PREFIX)
-        BIGWIG = '{0}.nodup.nonchrM.tn5.pf.pval.signal.bigwig'.format(
+        PBC_LOG = '{0}.pbc.qc'.format(INPUT_PREFIX)
+        FINAL_BAM = '{0}.sorted.nodup.noM.bam'.format(INPUT_PREFIX)
+        FINAL_BED = '{0}.nodup.tn5.tagAlign.gz'.format(INPUT_PREFIX)
+        BIGWIG = '{0}.readsInPeaks.bin5.centered.smooth.150.max200.bw'.format(
             INPUT_PREFIX)
-        PEAKS = '{0}.nodup.nonchrM.tn5.pf_peaks.narrowPeak'.format(
+        PEAKS = '{0}'.format(
             INPUT_PREFIX)
     else:  # mode 2
         FASTQ = args.fastq1
@@ -1394,7 +1393,7 @@ def main():
      NAIVE_OVERLAP_PEAKS, IDR_PEAKS, USE_SAMBAMBA_MARKDUP] = parse_args()
 
     # Set up the log file and timing
-    #logging.basicConfig(filename='test.log', level=logging.DEBUG)
+    logging.basicConfig(filename='test.log', level=logging.DEBUG)
     #start = timeit.default_timer()
 
     # First check if paired/single
@@ -1427,7 +1426,7 @@ def main():
     else:
         read_dups, percent_dup = get_picard_dup_stats(DUP_LOG, paired_status)
 
-    mito_dups, fract_dups_from_mito = get_mito_dups(ALIGNED_BAM,
+    mito_dups, fract_dups_from_mito = get_mito_dups(COORDSORT_BAM,
                                                     OUTPUT_PREFIX,
                                                     paired_status,
                                                     use_sambamba=USE_SAMBAMBA_MARKDUP)
@@ -1616,4 +1615,4 @@ def main():
 
     return None
 
-main()
+#main()

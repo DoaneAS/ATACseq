@@ -63,7 +63,7 @@ PBC="${WORKDIR}/$SAMPLE.pbc.qc"
 FINAL_BAM="${Sample}/${Sample}.sorted.nodup.noM.bam"
 FINAL_BED="${Sample}/${Sample}.nodup.tn5.tagAlign.gz"
 
-ALIGNED_BAM="${Sample}/${Sample}.bam"
+ALIGNED_BAM="${Sample}/${Sample}.sorted.bam"
 WORKDIR=$PWD
 OUTDIR="qc"
 OUTPREFIX=$Sample
@@ -87,9 +87,9 @@ F1="${Sample}.R1.trim.fastq.gz"
 F2="${Sample}.R2.trim.fastq.gz"
 
 
-cp "${Sample}/${Sample}.sorted.bam" "${Sample}/${Sample}.sort.bam"
+#cp "${Sample}/${Sample}.sorted.bam" "${Sample}/${Sample}.sort.bam"
 
-python /home/asd2007/ATACseq/run_ataqc.py --workdir $PWD/${Sample} \
+echo python /home/asd2007/ATACseq/run_ataqc.py --workdir $PWD/${Sample} \
     --outdir qc \
     --outprefix ${Sample} \
     --genome hg19 \
@@ -104,7 +104,7 @@ python /home/asd2007/ATACseq/run_ataqc.py --workdir $PWD/${Sample} \
     --fastq1 ${F1} \
     --fastq2 ${F2} \
     --alignedbam ${ALIGNED_BAM} \
-    --alignmentlog ${Sample}/${Sample}.align.log \
+    --alignmentlog "${Sample}/${Sample}.align.log" \
     --coordsortbam "${Sample}/${Sample}.sorted.bam" \
     --duplog "${Sample}/${Sample}.dup.qc" \
     --pbc "${Sample}/${Sample}.pbc.qc" \
@@ -113,8 +113,7 @@ python /home/asd2007/ATACseq/run_ataqc.py --workdir $PWD/${Sample} \
     --bigwig "$Sample/$Sample.readsInPeaks.bin5.centered.smooth.150.max200.bw" \
     --peaks "${Sample}/${Sample}.tn5.pf.narrowPeak.gz" \
     --naive_overlap_peaks "${Sample}/pseudo_reps/${Sample}.nodup.tn5.pooled.pf.pval0.1.500K.naive_overlap.narrowPeak.gz" \
-    --idr_peaks "${Sample}/pseudo_reps/${Sample}.nodup.tn5.pooled.pf.pval0.1.500K.naive_overlap.narrowPeak.gz.IDR" \
-    --use_sambamba_markdup
+    --idr_peaks "${Sample}/pseudo_reps/${Sample}.nodup.tn5.pooled.pf.pval0.1.500K.naive_overlap.narrowPeak.gz"
 
 
 

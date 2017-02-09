@@ -60,10 +60,10 @@ zcat ${PR2_TA_FILE} |  awk -F $'\t' 'BEGIN {OFS = FS}{ if ($6 == "+") {$2 = $2 +
 
 
 macs2 callpeak -t   ${POOLED_PREFIX}.pooled.tn5.tagAlign.gz -f BED -n  ${POOLED_PREFIX} -g $SPEC  --nomodel --shift -75 --extsize 150 --keep-dup all --bdg --SPMR --call-summits -p 1e-1
-sort -k 8gr,8gr ${POOLED_PREFIX}_peaks.narrowPeak | awk 'BEGIN{OFS="\t"}{$4="Peak_"NR ; print $0}' | gzip -nc > ${POOLED_PREFIX}.tn5.narrowPeak.gz
+sort -k 8gr,8gr ${POOLED_PREFIX}_peaks.narrowPeak | awk 'BEGIN{OFS="\t"}{$4="Peak_"NR ; print $0}' | gzip -nc > ${POOLED_PREFIX}.tn5.narrowPeak.gz &
 
 macs2 callpeak -t   ${PR_PREFIX}.pr1.tn5.tagAlign.gz -f BED -n  ${PR_PREFIX}.pr1 -g $SPEC  --nomodel --shift -75 --extsize 150 --keep-dup all --bdg --SPMR --call-summits -p 1e-1
-sort -k 8gr,8gr ${PR_PREFIX}.pr1_peaks.narrowPeak | awk 'BEGIN{OFS="\t"}{$4="Peak_"NR ; print $0}' | gzip -nc > ${PR_PREFIX}.pr1.tn5.narrowPeak.gz
+sort -k 8gr,8gr ${PR_PREFIX}.pr1_peaks.narrowPeak | awk 'BEGIN{OFS="\t"}{$4="Peak_"NR ; print $0}' | gzip -nc > ${PR_PREFIX}.pr1.tn5.narrowPeak.gz &
 
 macs2 callpeak -t ${PR_PREFIX}.pr2.tn5.tagAlign.gz -f BED -n  ${PR_PREFIX}.pr2 -g $SPEC  --nomodel --shift -75 --extsize 150 --keep-dup all --bdg --SPMR --call-summits -p 1e-1
 sort -k 8gr,8gr ${PR_PREFIX}.pr2_peaks.narrowPeak | awk 'BEGIN{OFS="\t"}{$4="Peak_"NR ; print $0}' | gzip -nc > ${PR_PREFIX}.pr2.tn5.narrowPeak.gz

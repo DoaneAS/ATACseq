@@ -33,24 +33,16 @@ fi
     out1prefix=$(echo $p1 | sed 's/\.bam$//')
     out1="${out1prefix}.sorted.bam"
     echo ${out1}
-    samtools view -S -u $p1 | samtools sort - > ${out1}
+    #samtools view -S -u $p1 | samtools sort - > ${out1}
     #index
+    sambamba sort -t ${NSLOTS} $p1 > ${out1}
+
     samtools index $out1
     # echo "aligning : $TMPDIR/${Sample}.R1.trim.fq ,  $TMPDIR/${Sample}.R2.trim.fq using bwa-mem.."
     # bwa mem -t ${NSLOTS} -M $TMPDIR/BWAIndex/genome.fa $TMPDIR/${Sample}.R1.trim.fastq $TMPDIR/${Sample}.R2.trim.fastq | samtools view -bS - >  $TMPDIR/${Sample}.bam
 #fi
 
 
-
-
-# convert to bam and sort
-echo "Sorting..."
-out1prefix=$(echo $p1 | sed 's/\.bam$//')
-out1="${out1prefix}.sorted.bam"
-echo ${out1}
-samtools view -S -u $p1 | samtools sort - > ${out1}
-#index
-samtools index $out1
 
 #samtools rmdup
 echo "Removing duplicates..."

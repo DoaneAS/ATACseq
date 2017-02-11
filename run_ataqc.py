@@ -249,7 +249,7 @@ def run_preseq(bam_w_dups, prefix):
     # First sort because this file no longer exists...
     sort_bam = 'samtools sort -o {1}.sorted.bam -T {1} -@ 2 {0}'.format(
         bam_w_dups, prefix)
-    os.system(sort_bam)
+   # os.system(sort_bam)
 
     logging.info('Running preseq...')
     preseq_data = '{0}.preseq.dat'.format(prefix)
@@ -1394,7 +1394,7 @@ def main():
 
     # Set up the log file and timing
     logging.basicConfig(filename='test.log', level=logging.DEBUG)
-    #start = timeit.default_timer()
+    start = timeit.default_timer()
 
     # First check if paired/single
     paired_status = determine_paired(FINAL_BAM)
@@ -1610,9 +1610,9 @@ def main():
             pass
     textfile.close()
 
-   # stop = timeit.default_timer()
-    #print "Run time:", str(datetime.timedelta(seconds=int(stop - start)))
+    stop = timeit.default_timer()
+    print "Run time:", str(datetime.timedelta(seconds=int(stop - start)))
 
     return None
 
-#main()
+main()

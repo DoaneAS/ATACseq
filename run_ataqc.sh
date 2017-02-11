@@ -1,8 +1,128 @@
 #!/bin/bash
+#$ -N ATACathena
+#$ -j y
+#$ -m e
+#$ -cwd
+#$ -l zenodotus=true
+###$ -l athena=true
+#$ -M ashley.doane@gmail.com
+###$ -l h_rt=42:00:00
+#$ -pe smp 2
+#$ -l h_vmem=8G
+#$ -R y
+#$ -o /home/asd2007/joblogs
+
+########### SETTINGS ###########
+TRIM=1 # 
+NUC=0 # run nucleoatac, extended runtime required
+BT2ALN=1 # bt2 recommnded!
+ATHENA=0
+##############################
+
+
+path=$1 #path to all the Samples
+gtf_path=$2 #Number indicating the reference gtf [1 for Human 2 for Mouse 3 for other]
+
+# Uses job array for each Sample in the folder
+file=$(ls ${path} | tail -n +${SGE_TASK_ID}| head -1)
+
+#change directory to node directory
+cd $TMPDIR
+
+echo "File : $file Read from $path\n"
+
+#Obtain the name of the Sample
+Sample=$(basename "$file")
+Sample=${Sample%%.*}
+
+#Add file checker if fastq or gz
+
+#copy the Samples with .gz extension to the tmp folder
+#rsync -r -v -a -z $path/$file/*.fastq ./
+
+#rsync -r -v -a -z $path/$file/*.fastq ./
+
+
+
+rsync -r -v -a -z $path/$file/* ./
+
+
+
+
+#fastq-dump --split-files ${SRA}
+
+#fastq-dump --split-files *.sra
+
+echo "Processing  $Sample ..."
+
+#Figuring out the Reference genome
+
+
+if [ $ATHENA == 1 ]
+then
+    REFDIR="/athena/elementolab/scratch/asd2007/Reference"
+    ANNOTDIR="/athena/elementolab/scratch/asd2007/Reference"
+else
+    REFDIR="/zenodotus/dat01/melnick_bcell_scratch/asd2007/Reference"
+    ANNOTDIR="/zenodotus/dat01/melnick_bcell_scratch/asd2007/Reference"
+fi
+
+if [ $gtf_path == 1 ]
+then
+    #gtf="/zenodotus/dat02/elemento_lab_scratch/oelab_scratch_scratch007/akv3001/mm10_UCSC_ref.gtf"
+	REF="${REFDIR}/Homo_sapiens/UCSC/hg19/Sequence/BWAIndex"
+	REFbt2="${REFDIR}/Homo_sapiens/UCSC/hg19/Sequence/Bowtie2Index"
+   # REFbt="/home/asd20i07/dat02/asd2007/Reference/Homo_sapiens/UCSC/mm10/Sequence/BowtieIndex/genome"
+    BLACK="${REFDIR}/encodeBlack.bed"
+    #BLACK="/athena/elementolab/scratch/asd2007/Reference/hg19/Anshul_Hg19UltraHighSignalArtifactRegions.bed"
+    #chrsz="/athena/elementolab/scratch/asd2007/Reference/hg19.genome.chrom.sizes"
+    fetchChromSizes hg19 > hg19.chrom.sizes
+    chrsz= $PWD/hg19.chrom.sizes
+    RG="hg19"
+    SPEC="hs"
+    REFGen="/athena/elementolab/scratch/asd2007/bin/bcbio/genomes/Hsapiens/hg19/seq/"
+    rsync -av /home/asd2007/Scripts/picardmetrics.conf ./
+
+elif [ $gtf_path == 2 ]
+then
+	gtf="/zenodotus/dat02/elemento_lab_scratch/oelab_scratch_scratch007/akv3001/Mus_UCSC_ref.gtf"
+	REF="/zenodotus/dat02/elemento_lab_scratch/oelab_scratch_scratch007/akv3001/Genomes/Mus_musculus/UCSC/mm10/Sequence/BWAIndex"
+    REFbt2="/zenodotus/dat02/elemento_lab_scratch/oelab_scratch_scratch007/akv3001/Genomes/Mus_musculus/UCSC/mm10/Sequence/Bowtie2Index"
+    BLACK="/athena/elementolab/scratch/asd2007/Reference/mm10-blacklist.bed"
+    RG="mm10"
+    SPEC="mm"
+    REFGen="/athena/elementolab/scratch/asd2007/bin/bcbio/genomes/Mmusculus/mm10/seq/"
+    #chrsz="/athena/elementolab/scratch/asd2007/Reference/mm10.genome.chrom.sizes"
+    fetchChromSizes mm10 > mm10.chrom.sizes
+    chrsz= $PWD/mm10.chrom.sizes
+    rsync -av /home/asd2007/Scripts/picardmetrics.Mouse.conf ./
+else
+	gtf="/zenodotus/dat02/elemento_lab_scratch/oelab_scratch_scratch007/akv3001/mm10_UCSC_ref.gtf"
+	REF="/zenodotus/dat02/elemento_lab_scratch/oelab_scratch_scratch007/akv3001/Genomes/Homo_sapiens/UCSC/mm10/Sequence/BWAIndex/genome.fa"
+fi
 
 # This script is an example test of the ataqc package
 
-Sample="sample_LY7sub"
+
+
+
+########### SETTINGS ###########
+TRIM=1 # 
+NUC=0 # run nucleoatac, extended runtime required
+BT2ALN=1 # bt2 recommnded!
+#ATHENA=1
+#
+
+
+if [ $ATHENA == 1 ]
+then
+    REFDIR="/athena/elementolab/scratch/asd2007/Reference"
+    ANNOTDIR="/athena/elementolab/scratch/asd2007/Reference"
+else
+    REFDIR="/zenodotus/dat01/melnick_bcell_scratch/asd2007/Reference"
+    ANNOTDIR="/zenodotus/dat01/melnick_bcell_scratch/asd2007/Reference"
+fi
+
 
 FINAL_BAM="${PWD}/${Sample}/${Sample}.sorted.nodup.noM.black.bam"
 FINAL_BED="${PWD}/${Sample}/${Sample}.nsorted.fixmate.nodup.noM.black.Tn5.tagAlign.gz"
@@ -16,10 +136,12 @@ GENOME='hg19' # This is the only genome that currently works
 
 SAMPLE="$Sample"
 # Annotation files
+
 ANNOTDIR="/home/asd2007/melnick_bcell_scratch/asd2007/Reference"
-X="/home/asd2007/melnick_bcell_scratch/asd2007/Reference/hg19/"
+#ANNOTDIR="/athena/elementolab/scratch/asd2007/Reference"
+
 DNASE_BED="${ANNOTDIR}/${GENOME}/reg2map_honeybadger2_dnase_all_p10_ucsc.bed.gz"
-BLACKLIST_BED="/home/asd2007/melnick_bcell_scratch/asd2007/Reference/hg19/wgEncodeDacMapabilityConsensusExcludable.bed.gz"
+BLACKLIST_BED="${ANNOTDIR}/${GENOME}/wgEncodeDacMapabilityConsensusExcludable.bed.gz"
 TSS_BED="${ANNOTDIR}/${GENOME}/hg19_RefSeq_stranded.bed.gz"
 REF_FASTA="${ANNOTDIR}/${GENOME}/encodeHg19Male.fa"
 PROM="${ANNOTDIR}/${GENOME}/reg2map_honeybadger2_dnase_prom_p2.bed.gz"
@@ -27,42 +149,41 @@ ENH="${ANNOTDIR}/${GENOME}/reg2map_honeybadger2_dnase_enh_p2.bed.gz"
 REG2MAP="${ANNOTDIR}/${GENOME}/dnase_avgs_reg2map_p10_merged_named.pvals.gz"
 ROADMAP_META="${ANNOTDIR}/${GENOME}/eid_to_mnemonic.txt"
 PBC="${WORKDIR}/$SAMPLE.pbc.qc"
-#F1="${Sample}.R1.trim.fastq.gz"
-#F2="${Sample}.R2.trim.fastq.gz"
-#
-#
-#python $HOME/ATACseq/run_ataqc.py --outdir ${Sample} \
-#    --outprefix ${Sample} \
-#    --genome hg19 \
-#    --ref /home/asd2007/melnick_bcell_scratch/asd2007/Reference/hg19/encodeHg19Male/encodeHg19Male.fa \
-#    --tss /home/asd2007/melnick_bcell_scratch/asd2007/Reference/hg19/hg19_RefSeq_stranded.bed.gz \
-#    --dnase /home/asd2007/melnick_bcell_scratch/asd2007/Reference/hg19/reg2map_honeybadger2_dnase_all_p10_ucsc.bed.gz \
-#    --blacklist /home/asd2007/melnick_bcell_scratch/asd2007/Reference/hg19/wgEncodeDacMapabilityConsensusExcludable.bed.gz \
-#    --prom /home/asd2007/melnick_bcell_scratch/asd2007/Reference/hg19/reg2map_honeybadger2_dnase_prom_p2.bed.gz \
-#    --enh /home/asd2007/melnick_bcell_scratch/asd2007/Reference/hg19/reg2map_honeybadger2_dnase_enh_p2.bed.gz \
-#    --reg2map /home/asd2007/melnick_bcell_scratch/asd2007/Reference/hg19/dnase_avgs_reg2map_p10_merged_named.pvals.gz \
-#    --meta /home/asd2007/melnick_bcell_scratch/asd2007/Reference/hg19/eid_to_mnemonic.txt \
-#    --fastq1 ${F1} \
-#    --fastq2 ${F2} \
-#    --alignedbam ${ALIGNED_BAM} \
-#    --alignmentlog ${Sample}/${Sample}.align.log \
-#    --coordsortbam "${Sample}/${Sample}.sorted.bam" \
-#    --duplog "${Sample}/${Sample}.sorted.dup.qc" \
-#    --pbc "${Sample}/${Sample}.sorted.pbc.qc" \
-#    --finalbam "${FINAL_BAM}" \
-#    --finalbed "${FINAL_BED}" \
-#    --bigwig "$Sample/$Sample.readsInPeaks.bin5.centered.smooth.150.max200.bw" \
-#    --peaks "${Sample}/${Sample}.tn5.pf.narrowPeak.gz" \
-#    --naive_overlap_peaks "${Sample}/${Sample}.tn5.pooled.pf.pval0.1.500K.naive_overlap.narrowPeak.gz"
-#
 
 
 
 
 
+
+
+
+
+#################
+################
+#### ATACqc ##
+
+
+
+
+#FINAL_BAM="${Sample}/${Sample}.sorted.nodup.noM.bam"
+#FINAL_BED="${Sample}/${Sample}.nodup.tn5.tagAlign.gz"
+#ALIGNED_BAM="${PWD}/${Sample}/${Sample}.bam"
+#WORKDIR=$PWD
+#OUTDIR="qc"
+
+
+
+
+
+GENOME='hg19' # This is the only genome that currently works
+SAMPLE="$Sample"
+
+PBC="${WORKDIR}/$SAMPLE.pbc.qc"
 FINAL_BAM="${Sample}/${Sample}.sorted.nodup.noM.bam"
 FINAL_BED="${Sample}/${Sample}.nodup.tn5.tagAlign.gz"
 
+F1="${Sample}.R1.trim.fastq.gz"
+F2="${Sample}.R2.trim.fastq.gz"
 ALIGNED_BAM="${Sample}/${Sample}.sorted.bam"
 WORKDIR=$PWD
 OUTDIR="qc"
@@ -70,37 +191,32 @@ OUTPREFIX=$Sample
 INPREFIX=$Sample
 GENOME='hg19' # This is the only genome that currently works
 
-SAMPLE="$Sample"
 # Annotation files
-ANNOTDIR="/home/asd2007/melnick_bcell_scratch/asd2007/Reference"
-X="/home/asd2007/melnick_bcell_scratch/asd2007/Reference/hg19/"
+X="/athena/elementolab/scratch/asd2007/Reference/hg19/"
 DNASE_BED="${ANNOTDIR}/${GENOME}/reg2map_honeybadger2_dnase_all_p10_ucsc.bed.gz"
-BLACKLIST_BED="/home/asd2007/melnick_bcell_scratch/asd2007/Reference/hg19/wgEncodeDacMapabilityConsensusExcludable.bed.gz"
+BLACKLIST_BED="${ANNOTDIR}/${GENOME}/wgEncodeDacMapabilityConsensusExcludable.bed.gz"
 TSS_BED="${ANNOTDIR}/${GENOME}/hg19_RefSeq_stranded.bed.gz"
 REF_FASTA="${ANNOTDIR}/${GENOME}/encodeHg19Male.fa"
 PROM="${ANNOTDIR}/${GENOME}/reg2map_honeybadger2_dnase_prom_p2.bed.gz"
 ENH="${ANNOTDIR}/${GENOME}/reg2map_honeybadger2_dnase_enh_p2.bed.gz"
 REG2MAP="${ANNOTDIR}/${GENOME}/dnase_avgs_reg2map_p10_merged_named.pvals.gz"
 ROADMAP_META="${ANNOTDIR}/${GENOME}/eid_to_mnemonic.txt"
-PBC="${WORKDIR}/$SAMPLE.pbc.qc"
-F1="${Sample}.R1.trim.fastq.gz"
-F2="${Sample}.R2.trim.fastq.gz"
 
 
 #cp "${Sample}/${Sample}.sorted.bam" "${Sample}/${Sample}.sort.bam"
 
-echo python /home/asd2007/ATACseq/run_ataqc.py --workdir $PWD/${Sample} \
+python /home/asd2007/ATACseq/run_ataqc.py --workdir $PWD/${Sample} \
     --outdir qc \
     --outprefix ${Sample} \
     --genome hg19 \
-    --ref /home/asd2007/melnick_bcell_scratch/asd2007/Reference/hg19/encodeHg19Male/encodeHg19Male.fa \
-    --tss /home/asd2007/melnick_bcell_scratch/asd2007/Reference/hg19/hg19_RefSeq_stranded.bed.gz \
-    --dnase /home/asd2007/melnick_bcell_scratch/asd2007/Reference/hg19/reg2map_honeybadger2_dnase_all_p10_ucsc.bed.gz \
-    --blacklist /home/asd2007/melnick_bcell_scratch/asd2007/Reference/hg19/wgEncodeDacMapabilityConsensusExcludable.bed.gz \
-    --prom /home/asd2007/melnick_bcell_scratch/asd2007/Reference/hg19/reg2map_honeybadger2_dnase_prom_p2.bed.gz \
-    --enh /home/asd2007/melnick_bcell_scratch/asd2007/Reference/hg19/reg2map_honeybadger2_dnase_enh_p2.bed.gz \
-    --reg2map /home/asd2007/melnick_bcell_scratch/asd2007/Reference/hg19/dnase_avgs_reg2map_p10_merged_named.pvals.gz \
-    --meta /home/asd2007/melnick_bcell_scratch/asd2007/Reference/hg19/eid_to_mnemonic.txt \
+    --ref "${REFDIR}/hg19/encodeHg19Male/encodeHg19Male.fa" \
+    --tss "${REFDIR}/hg19/hg19_RefSeq_stranded.bed.gz" \
+    --dnase "${REFDIR}/hg19/reg2map_honeybadger2_dnase_all_p10_ucsc.bed.gz" \
+    --blacklist "${REFDIR}/hg19/wgEncodeDacMapabilityConsensusExcludable.bed.gz" \
+    --prom "${REFDIR}/hg19/reg2map_honeybadger2_dnase_prom_p2.bed.gz" \
+    --enh "${REFDIR}/hg19/reg2map_honeybadger2_dnase_enh_p2.bed.gz" \
+    --reg2map ${REG2MAP} \
+    --meta ${ROADMAP_META} \
     --fastq1 ${F1} \
     --fastq2 ${F2} \
     --alignedbam ${ALIGNED_BAM} \
@@ -110,10 +226,36 @@ echo python /home/asd2007/ATACseq/run_ataqc.py --workdir $PWD/${Sample} \
     --pbc "${Sample}/${Sample}.pbc.qc" \
     --finalbam "${FINAL_BAM}" \
     --finalbed "${FINAL_BED}" \
-    --bigwig "$Sample/$Sample.readsInPeaks.bin5.centered.smooth.150.max200.bw" \
-    --peaks "${Sample}/${Sample}.tn5.pf.narrowPeak.gz" \
+    --bigwig "$Sample/$Sample.smooth150.center.extend.fpkm.max150.bw" \
+    --peaks "${Sample}/${Sample}.nodup.tn5.pval0.1.500k.narrowPeak.gz" \
+    # --peaks "${Sample}/${Sample}.tn5.pf.narrowPeak.gz" \
     --naive_overlap_peaks "${Sample}/pseudo_reps/${Sample}.nodup.tn5.pooled.pf.pval0.1.500K.naive_overlap.narrowPeak.gz" \
-    --idr_peaks "${Sample}/pseudo_reps/${Sample}.nodup.tn5.pooled.pf.pval0.1.500K.naive_overlap.narrowPeak.gz"
+    --idr_peaks "${Sample}/IDR/${Sample}.IDR.txt.IDR0.1.filt.narrowPeak.gz"
+
+
+
+
+
+
+
+rsync -avP $TMPDIR/${Sample} $path/${Sample}
+rsync -r -a -v $TMPDIR/${Sample} $path/${Sample}
+
+
+#############################
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -210,6 +352,50 @@ echo python /home/asd2007/ATACseq/run_ataqc.py --workdir $PWD/${Sample} \
 
 
 : << COMMENTBLOCK
+
+
+
+
+
+
+
+echo python /home/asd2007/ATACseq/run_ataqc.py --workdir $PWD/${Sample} \
+    --outdir qc \
+    --outprefix ${Sample} \
+    --genome hg19 \
+    --ref /home/asd2007/melnick_bcell_scratch/asd2007/Reference/hg19/encodeHg19Male/encodeHg19Male.fa \
+    --tss /home/asd2007/melnick_bcell_scratch/asd2007/Reference/hg19/hg19_RefSeq_stranded.bed.gz \
+    --dnase /home/asd2007/melnick_bcell_scratch/asd2007/Reference/hg19/reg2map_honeybadger2_dnase_all_p10_ucsc.bed.gz \
+    --blacklist /home/asd2007/melnick_bcell_scratch/asd2007/Reference/hg19/wgEncodeDacMapabilityConsensusExcludable.bed.gz \
+    --prom /home/asd2007/melnick_bcell_scratch/asd2007/Reference/hg19/reg2map_honeybadger2_dnase_prom_p2.bed.gz \
+    --enh /home/asd2007/melnick_bcell_scratch/asd2007/Reference/hg19/reg2map_honeybadger2_dnase_enh_p2.bed.gz \
+    --reg2map /home/asd2007/melnick_bcell_scratch/asd2007/Reference/hg19/dnase_avgs_reg2map_p10_merged_named.pvals.gz \
+    --meta /home/asd2007/melnick_bcell_scratch/asd2007/Reference/hg19/eid_to_mnemonic.txt \
+    --fastq1 ${F1} \
+    --fastq2 ${F2} \
+    --alignedbam ${ALIGNED_BAM} \
+    --alignmentlog "${Sample}/${Sample}.align.log" \
+    --coordsortbam "${Sample}/${Sample}.sorted.bam" \
+    --duplog "${Sample}/${Sample}.dup.qc" \
+    --pbc "${Sample}/${Sample}.pbc.qc" \
+    --finalbam "${FINAL_BAM}" \
+    --finalbed "${FINAL_BED}" \
+    --bigwig "$Sample/$Sample.readsInPeaks.bin5.centered.smooth.150.max200.bw" \
+    --peaks "${Sample}/${Sample}.tn5.pf.narrowPeak.gz" \
+    --naive_overlap_peaks "${Sample}/pseudo_reps/${Sample}.nodup.tn5.pooled.pf.pval0.1.500K.naive_overlap.narrowPeak.gz" \
+    --idr_peaks "${Sample}/pseudo_reps/${Sample}.nodup.tn5.pooled.pf.pval0.1.500K.naive_overlap.narrowPeak.gz"
+
+
+
+
+
+
+
+
+
+
+
+
 
                     --outprefix $OUTPREFIX \
                     --genome $GENOME \

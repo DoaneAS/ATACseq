@@ -7,15 +7,15 @@
 #$ -l athena=true
 #$ -M ashley.doane@gmail.com
 ###$ -l h_rt=42:00:00
-#$ -pe smp 8
-#$ -l h_vmem=10G
+#$ -pe smp 4
+#$ -l h_vmem=12G
 #$ -R y
 #$ -o /home/asd2007/joblogs
 
 ########### SETTINGS ###########
-TRIM=1 # 
+TRIM=0 # 
 NUC=0 # run nucleoatac, extended runtime required
-BT2ALN=1 # bt2 recommnded!
+BT2ALN=0 # bt2 recommnded!
 ATHENA=1
 ##############################
 
@@ -200,13 +200,13 @@ cp $TMPDIR/${Sample}/${Sample}.nsorted.fixmate.nodup.noM.tn5.tagAlign.gz  $TMPDI
 
 cp $TMPDIR/${Sample}/${Sample}.nsorted.fixmate.nodup.noM.bedpe.gz $TMPDIR/${Sample}/${Sample}.nodup.bedpe.gz
 
-macs2 callpeak -t  $TMPDIR/${Sample}/${Sample}.nodup.tn5.tagAlign.gz -f BED -n $TMPDIR/${Sample}/${Sample}.tag.narrow -g $SPEC  --nomodel --shift -75 --extsize 150 --keep-dup all --bdg --SPMR --call-summits -p 1e-1
+macs2 callpeak -t  $TMPDIR/${Sample}/${Sample}.nodup.tn5.tagAlign.gz -f BED -n $TMPDIR/${Sample}/${Sample}.tag.narrow -g $SPEC  --nomodel --shift -75 --extsize 150 --keep-dup all --bdg --SPMR --call-summits -p 1e-2
 
 /home/asd2007/ATACseq/narrowpeak.py $TMPDIR/${Sample}/${Sample}.tag.narrow_peaks.narrowPeak $TMPDIR/${Sample}/${Sample}.tn5.narrowPeak.gz 
 
 sort -k 8gr,8gr $TMPDIR/${Sample}/${Sample}.tag.narrow_peaks.narrowPeak | awk 'BEGIN{OFS="\t"}{$4="Peak_"NR ; print $0}' | gzip -nc > $TMPDIR/${Sample}/${Sample}.tn5.pf.narrowPeak.gz
 
-zcat $TMPDIR/${Sample}/${Sample}.tn5.pf.narrowPeak.gz | sort -grk8 | head -n 500000 | gzip -c > $$TMPDIR/${Sample}/${Sample}.tn5.pval0.1.500k.narrowPeak.gz
+zcat $TMPDIR/${Sample}/${Sample}.tn5.pf.narrowPeak.gz | sort -grk8 | head -n 500000 | gzip -c > $$TMPDIR/${Sample}/${Sample}.tn5.pval0.01.500k.narrowPeak.gz
 
 ## BROAD peaks ##
 macs2 callpeak -t  $TMPDIR/${Sample}/${Sample}.nsorted.fixmate.nodup.noM.tn5.tagAlign.gz -f BED -n $TMPDIR/${Sample}/${Sample}.tag.broad -g $SPEC  --nomodel --shift -75 --extsize 150 --keep-dup all --broad --broad-cutoff 0.1
@@ -386,7 +386,7 @@ rsync -r -a -v $TMPDIR/${Sample}/*.bw  /athena/elementolab/scratch/asd2007/Proje
 #rsync -r -v $TMPDIR/${Sample}* /zenodotus/dat01/melnick_bcell_scratch/asd2007/COVERAGE/ATAC/test/peaksNorm/
 
 # fixing bug that removed sorted bam when cleaning up
-sambamba sort --nthreads --memory-limit 30GB \
+sambamba sort --nthreads --memory-limit 40GB \
          --nthreads ${NSLOTS} --tmpdir ${TMPDIR} --out ${TMPDIR}/${Sample}/${Sample}.bam ${TMPDIR}/${Sample}/${Sample}.bam
 
 samtools index $TMPDIR/${Sample}/${Sample}.sorted.bam 
@@ -529,7 +529,7 @@ python /home/asd2007/ATACseq/run_ataqc.athena.py --workdir $PWD/${Sample} \
     --finalbam "${FINAL_BAM}" \
     --finalbed "${FINAL_BED}" \
     --bigwig "$Sample/$Sample.smooth150.center.extend.fpkm.max150.bw" \
-    --peaks "${Sample}/${Sample}.nodup.tn5.pval0.1.500k.narrowPeak.gz" \
+    --peaks "${Sample}/${Sample}.nodup.tn5.pval0.01.500k.narrowPeak.gz" \
     --naive_overlap_peaks "${Sample}/pseudo_reps/${Sample}.nodup.tn5.pooled.pf.pval0.1.500K.naive_overlap.narrowPeak.gz" \
     --idr_peaks "${Sample}/IDR/${Sample}.IDR.txt.IDR0.1.filt.narrowPeak.gz"
 

@@ -4,7 +4,8 @@
 
 p1=$1
 
-BLACK="/home/asd2007/melnick_bcell_scratch/asd2007/Reference/encodeBlack.bed"
+
+#BLACK="/home/asd2007/melnick_bcell_scratch/asd2007/Reference/encodeBlack.bed"
 # help
 if [ -z "$p1"  ]
 then
@@ -35,8 +36,10 @@ fi
     echo ${out1}
     #samtools view -S -u $p1 | samtools sort - > ${out1}
     #index
-    sambamba sort -t ${NSLOTS} $p1 > ${out1}
+#    sambamba sort -t ${NSLOTS} $p1 > ${out1}
 
+    sambamba sort --memory-limit 30GB \
+             --nthreads ${NSLOTS} --tmpdir ${TMPDIR} --out ${out1} $p1
     samtools index $out1
     # echo "aligning : $TMPDIR/${Sample}.R1.trim.fq ,  $TMPDIR/${Sample}.R2.trim.fq using bwa-mem.."
     # bwa mem -t ${NSLOTS} -M $TMPDIR/BWAIndex/genome.fa $TMPDIR/${Sample}.R1.trim.fastq $TMPDIR/${Sample}.R2.trim.fastq | samtools view -bS - >  $TMPDIR/${Sample}.bam
@@ -81,6 +84,10 @@ do
 ## make bam with marked dups and generate PBC file for QC
 
 samtools sort -n $p1 -o ${out1prefix}.nsort.bam
+
+#sambamba sort --memory-limit 30GB \
+#         --nthreads ${NSLOTS} --tmpdir ${TMPDIR} --out ${TMPDIR}/${Sample}/${Sample}.bam ${TMPDIR}/${Sample}/${Sample}.bam
+
 samtools fixmate -r ${out1prefix}.nsort.bam ${out1prefix}.nsort.fixmate.bam
 samtools view -F 1804 -f 2 -u  ${out1prefix}.nsort.fixmate.bam | samtools sort - > ${out1prefix}.filt.srt.bam
 

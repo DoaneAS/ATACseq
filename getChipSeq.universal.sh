@@ -7,12 +7,12 @@
 #$ -l os=rhel6.3
 #$ -M ashley.doane@gmail.com
 #$ -l h_rt=33:00:00
-#$ -pe smp 4-8
-#$ -l h_vmem=8G
+#$ -pe smp 4
+#$ -l h_vmem=11G
 #$ -R y
 #$ -o /home/asd2007/joblogs
 
-
+BT2=1
 INPUT_FASTQ=1
 path=$1 #path to all the Sample folders
 
@@ -78,7 +78,7 @@ then
 	REF="/zenodotus/dat02/elemento_lab_scratch/oelab_scratch_scratch007/akv3001/Genomes/Homo_sapiens/UCSC/hg19/Sequence/BWAIndex"
 	REFbt2="/zenodotus/dat02/elemento_lab_scratch/oelab_scratch_scratch007/akv3001/Genomes/Homo_sapiens/UCSC/hg19/Sequence/Bowtie2Index"
    # REFbt="/home/asd20i07/dat02/asd2007/Reference/Homo_sapiens/UCSC/mm10/Sequence/BowtieIndex/genome"
-    BLACK="/home/asd2007/dat02/asd2007/Reference/encodeBlack.bed"
+  #  BLACK="/home/asd2007/dat02/asd2007/Reference/encodeBlack.bed"
     BLACK="/home/asd2007/melnick_bcell_scratch/asd2007/Reference/hg19/Anshul_Hg19UltraHighSignalArtifactRegions.bed"
     chrsz="/home/asd2007/melnick_bcell_scratch/asd2007/Reference/hg19.genome.chrom.sizes"
     RG="hg19"
@@ -106,27 +106,6 @@ mkdir ${TMPDIR}/${Sample}
 
 echo "ls of pwd is"
 ls -lrth
-
-
-
-
-
-#bowtie2  -X 2000 -p ${NSLOTS} -x $TMPDIR/Bowtie2Index/genome -1 $TMPDIR/R1/${Sample}.R1.fq -2 $TMPDIR/R2/${Sample}.R2.fq -S $TMPDIR/${Sample}/${Sample}.bt2.sam
-
-
-
-   # samtools sort  $TMPDIR/${Sample}.bam -o $TMPDIR/${Sample}/${Sample}.sorted.bam
-    #cp $TMPDIR/${Sample}/${Sample}.sorted.bam  $TMPDIR/${Sample}/${Sample}.bt2.sorted.bam``
-
-
-
-
-
-
-#htseq-count -q  -s no -f bam $TMPDIR/${Sample}.sorted_name_sorted.bam $TMPDIR/$gtf_name  > $TMPDIR/${Sample}.bam.count
-#CONT="/home/asd2007/melnick_bcell_scratch/asd2007/ChipSeq/MD901shCrebpPooledInput/Sample_md901_pooled_input/Sample_md901_pooled_input/Sample_md901_pooled_input.sorted.bam"
-#CONT="/home/asd2007/dat02/asd2007/Projects/DataSets/PCa/ETV1/sample_SRR863539_Input/sample_SRR863539_Input/sample_SRR863539_Input.sorted.nodup.black.bam"
-#rsync -avP ${CONT} $TMPDIR/
 
 ls -lrth $TMPDIR
 
@@ -168,7 +147,7 @@ then
 fi
 
 
-#CONT="$TMPDIR/${Sample}/${Sample}.INPUT.sorted.nodup.bam"
+CONT="$TMPDIR/${Sample}/${Sample}.INPUT.sorted.nodup.bam"
 
 
 fastq-dump --gzip --skip-technical  --readids --dumpbase --split-files --clip *.sra
@@ -182,37 +161,19 @@ echo "----------bowtie2 aligning-------------"
 #bowtie2  --very-sensitive-local -p ${NSLOTS} -x $TMPDIR/Bowtie2Index/genome -U $TMPDIR/R1/${Sample}.fastq.gz -S $TMPDIR/${Sample}.sam
 
 
-
-bowtie2 --very-sensitive-local --threads ${NSLOTS} -x $TMPDIR/Bowtie2Index/genome \
+if [ $BT2 == 1 ]
+then
+    bowtie2 --very-sensitive-local --threads ${NSLOTS} -x $TMPDIR/Bowtie2Index/genome \
         -U $TMPDIR/R1/${Sample}.fastq.gz  2> ${Sample}/${Sample}.align.log| \
-    samtools view -bS - > $TMPDIR/${Sample}/${Sample}.bam
-
+        samtools view -bS - > $TMPDIR/${Sample}/${Sample}.bam
+    sambamba sort --memory-limit 35GB \
+             --nthreads ${NSLOTS} --tmpdir ${TMPDIR} --out $TMPDIR/${Sample}/${Sample}.sorted.bam $TMPDIR/${Sample}/${Sample}.bam
+    samtools index $TMPDIR/${Sample}/${Sample}.sorted.bam
+fi
 #bwa mem -t ${NSLOTS} ${REF}*.fa $TMPDIR/R1/${Sample}.fq > ${TMPDIR}/${Sample}/${Sample}.sam
 
-echo "----------Samtools Converting to Sorted bam-----------------"
 
 
-
-samtools sort $TMPDIR/${Sample}/${Sample}.bam -o $TMPDIR/${Sample}/${Sample}.sorted.bam
-
-
-
-
-echo "----------Samtools Converting to Sorted bam-----------------"
-
-#samtools view -bS $TMPDIR/${Sample}/${Sample}.sam| samtools sort  - $TMPDIR/${Sample}/${Sample}.sorted
-
-
-
-
-
-#remove sam file after converted to sorted bam
-
-#rsync -avP $TMPDIR/${Sample} $path/${Sample}
-
-echo "Create index"
-
-samtools index  $TMPDIR/${Sample}/${Sample}.sorted.bam
 
 echo "----------------------Remove duplicates--------------------"
 #Remove duplicates using picard
@@ -220,16 +181,6 @@ echo "----------------------Remove duplicates--------------------"
 
 mkdir -p ${TMPDIR}/tmp
 picard MarkDuplicates  INPUT=$TMPDIR/${Sample}/${Sample}.sorted.bam METRICS_FILE=$TMPDIR/${Sample}/dedup.txt REMOVE_DUPLICATES=true OUTPUT=$TMPDIR/${Sample}/${Sample}.sorted.nodup.bam VALIDATION_STRINGENCY=LENIENT ASSUME_SORTED=True
-
-
-#java -Xmx8g -jar /home/ole2001/PROGRAMS/SOFT/picard-tools-1.71/MarkDuplicates.jar REMOVE_DUPLICATES=true INPUT=$CONT METRICS_FILE=$TMPDIR/${Sample}/Input.dedup.txt OUTPUT=$TMPDIR/${Sample}/${Sample}.INPUT.sorted.nodup.bam VALIDATION_STRINGENCY=LENIENT ASSUME_SORTED=True
-
-
-
-#samtools rmdup $TMPDIR/${Sample}/${Sample}.sorted.bam $TMPDIR/${Sample}/${Sample}.sorted.nodup.bam
-
-
-#rsync -a -vP $TMPDIR/${Sample} $path/${Sample}
 
 
 
@@ -313,6 +264,8 @@ rm -f ${prefix}_FE.bdg
 sort -k1,1 -k2,2n ${prefix}_fc.bedgraph > ${prefix}_fc.srt.bedgraph
 
 bedGraphToBigWig  ${prefix}_fc.srt.bedgraph hg19.chrom.sizes ${prefix}_fc.bw
+
+rm ${Sample}/*.bedgraph
 
 #slopBed -i ${prefix}_FE.bdg -g $chrsz -b 0 | bedClip stdin $chrsz ${prefix}.FE.bedGraph
 

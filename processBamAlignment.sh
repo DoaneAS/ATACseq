@@ -4,7 +4,8 @@
 
 p1=$1
 
-BLACK="/home/asd2007/melnick_bcell_scratch/asd2007/Reference/encodeBlack.bed"
+
+#BLACK="/home/asd2007/melnick_bcell_scratch/asd2007/Reference/encodeBlack.bed"
 # help
 if [ -z "$p1"  ]
 then
@@ -33,24 +34,18 @@ fi
     out1prefix=$(echo $p1 | sed 's/\.bam$//')
     out1="${out1prefix}.sorted.bam"
     echo ${out1}
-    samtools view -S -u $p1 | samtools sort - > ${out1}
+    #samtools view -S -u $p1 | samtools sort - > ${out1}
     #index
+#    sambamba sort -t ${NSLOTS} $p1 > ${out1}
+
+    sambamba sort --memory-limit 30GB \
+             --nthreads ${NSLOTS} --tmpdir ${TMPDIR} --out ${out1} $p1
     samtools index $out1
     # echo "aligning : $TMPDIR/${Sample}.R1.trim.fq ,  $TMPDIR/${Sample}.R2.trim.fq using bwa-mem.."
     # bwa mem -t ${NSLOTS} -M $TMPDIR/BWAIndex/genome.fa $TMPDIR/${Sample}.R1.trim.fastq $TMPDIR/${Sample}.R2.trim.fastq | samtools view -bS - >  $TMPDIR/${Sample}.bam
 #fi
 
 
-
-
-# convert to bam and sort
-echo "Sorting..."
-out1prefix=$(echo $p1 | sed 's/\.bam$//')
-out1="${out1prefix}.sorted.bam"
-echo ${out1}
-samtools view -S -u $p1 | samtools sort - > ${out1}
-#index
-samtools index $out1
 
 #samtools rmdup
 echo "Removing duplicates..."
@@ -62,18 +57,18 @@ picard MarkDuplicates INPUT=${out1} OUTPUT=${out2} METRICS_FILE="${out2}.dups.lo
 samtools index $out2
 
 
-out2m=$(echo $out1 | sed 's/\.bam$/.nodup.noM.bam/')
+out2m=$(echo $out1 | sed 's/\.bam$/.nodup.noM.temp.bam/')
 
 samtools idxstats $out2 | cut -f 1 | grep -v chrM | xargs samtools view -b $out2 > $out2m
 
 
 #something odd happening
 out2mb=$(echo $out1 | sed 's/\.bam$/.no.black.bam/')
-bedtools subtract -A -a $out2m -b $BLACK > $out2mb
+#bedtools subtract -A -a $out2m -b $BLACK > $out2mb
 # Remove multimapping and improper reads
 
-out3=$(echo $out1 | sed 's/\.bam$/.nodup.noM.black.bam/')
-samtools view -F 1804 -b ${out2mb} > ${out3}
+out3=$(echo $out1 | sed 's/\.bam$/.nodup.noM.bam/')
+samtools view -F 1804 -b ${out2m} > ${out3}
 samtools index $out3
 
 
@@ -86,8 +81,13 @@ do
 
 
 
+## make bam with marked dups and generate PBC file for QC
 
 samtools sort -n $p1 -o ${out1prefix}.nsort.bam
+
+#sambamba sort --memory-limit 30GB \
+#         --nthreads ${NSLOTS} --tmpdir ${TMPDIR} --out ${TMPDIR}/${Sample}/${Sample}.bam ${TMPDIR}/${Sample}/${Sample}.bam
+
 samtools fixmate -r ${out1prefix}.nsort.bam ${out1prefix}.nsort.fixmate.bam
 samtools view -F 1804 -f 2 -u  ${out1prefix}.nsort.fixmate.bam | samtools sort - > ${out1prefix}.filt.srt.bam
 

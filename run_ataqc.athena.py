@@ -319,14 +319,14 @@ def get_picard_complexity_metrics(aligned_bam, prefix):
     Picard EsimateLibraryComplexity
     '''
     out_file = '{0}.picardcomplexity.qc'.format(prefix)
-    #get_gc_metrics = ('java -Xmx4G -jar '
-    #                  '{2}/picard.jar '
-    #                  'EstimateLibraryComplexity INPUT={0} OUTPUT={1} '
-    #                  'VERBOSITY=ERROR '
-    #                  'QUIET=TRUE').format(aligned_bam,
-    #                                       out_file,
-    #                                       os.environ['PICARDROOT'])
-    #os.system(get_gc_metrics)
+    get_gc_metrics = ('java -Xmx4G -jar '
+                      '{2}/picard.jar '
+                      'EstimateLibraryComplexity INPUT={0} OUTPUT={1} '
+                      'VERBOSITY=ERROR '
+                      'QUIET=TRUE').format(aligned_bam,
+                                           out_file,
+                                           os.environ['PICARDROOT'])
+    os.system(get_gc_metrics)
 
     # Extract the actual estimated library size
     header_seen = False
@@ -1259,16 +1259,16 @@ def parse_args():
     # Annotation files
     parser.add_argument('--genome', help='Genome build used', default="hg19")
     parser.add_argument('--ref', help='Reference fasta file', 
-                        default="/home/asd2007/melnick_bcell_scratch/asd2007/Reference/hg19/encodeHg19Male.fa")
-    parser.add_argument('--tss', help='TSS file', default="/home/asd2007/melnick_bcell_scratch/asd2007/Reference/hg19/hg19_RefSeq_stranded.bed.gz")
+                        default="/athena/elementolab/scratch/asd2007/Reference/hg19/encodeHg19Male.fa")
+    parser.add_argument('--tss', help='TSS file', default="/athena/elementolab/scratch/asd2007/Reference/hg19/hg19_RefSeq_stranded.bed.gz")
     parser.add_argument('--dnase', help='Open chromatin region file', 
-                        default="/home/asd2007/melnick_bcell_scratch/asd2007/Reference/hg19/reg2map_honeybadger2_dnase_all_p10_ucsc.bed.gz") 
+                        default="/athena/elementolab/scratch/asd2007/Reference/hg19/reg2map_honeybadger2_dnase_all_p10_ucsc.bed.gz") 
     parser.add_argument('--blacklist',  help='Blacklisted region file', default="home/asd2007/melnick_bcell_scratch/asd2007/Reference/hg19/wgEncodeDacMapabilityConsensusExcludable.bed.gz")
-    parser.add_argument('--prom', help='Promoter region file', default="/home/asd2007/melnick_bcell_scratch/asd2007/Reference/hg19/reg2map_honeybadger2_dnase_prom_p2.bed.gz")
-    parser.add_argument('--enh', help='Enhancer region file', default="/home/asd2007/melnick_bcell_scratch/asd2007/Reference/hg19/reg2map_honeybadger2_dnase_enh_p2.bed.gz ")
-    parser.add_argument('--reg2map_bed', help='file of regions used to generate reg2map signals', default="/home/asd2007/melnick_bcell_scratch/asd2007/Reference/hg19/reg2map_honeybadger2_dnase_all_p10_ucsc.bed.gz")
-    parser.add_argument('--reg2map', default="/home/asd2007/melnick_bcell_scratch/asd2007/Reference/hg19/dnase_avgs_reg2map_p10_merged_named.pvals.gz")
-    parser.add_argument('--meta', help='Roadmap metadata', default='/home/asd2007/melnick_bcell_scratch/asd2007/Reference/hg19/eid_to_mnemonic.txt')
+    parser.add_argument('--prom', help='Promoter region file', default="/athena/elementolab/scratch/asd2007/Reference/hg19/reg2map_honeybadger2_dnase_prom_p2.bed.gz")
+    parser.add_argument('--enh', help='Enhancer region file', default="/athena/elementolab/scratch/asd2007/Reference/hg19/reg2map_honeybadger2_dnase_enh_p2.bed.gz ")
+    parser.add_argument('--reg2map_bed', help='file of regions used to generate reg2map signals', default="/athena/elementolab/scratch/asd2007/Reference/hg19/reg2map_honeybadger2_dnase_all_p10_ucsc.bed.gz")
+    parser.add_argument('--reg2map', default="/athena/elementolab/scratch/asd2007/Reference/hg19/dnase_avgs_reg2map_p10_merged_named.pvals.gz")
+    parser.add_argument('--meta', help='Roadmap metadata', default='/athena/elementolab/scratch/asd2007/Reference/hg19/eid_to_mnemonic.txt')
     
     # Choose which mode
    # parser.add_argument('--pipeline',

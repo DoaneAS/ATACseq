@@ -1,28 +1,27 @@
 #!/bin/bash -l
-#$ -N ATACseq
+#$ -N ATACathena
 #$ -j y
-#$ -m a
+#$ -m e
 #$ -cwd
-#$ -l zenodotus=true
-#$ -l os=rhel6.3
+### -l zenodotus=true
+#$ -l athena=true
 #$ -M ashley.doane@gmail.com
-#$ -l h_rt=23:00:00
-#$ -pe smp 8-16
+###$ -l h_rt=42:00:00
+#$ -pe smp 4
 #$ -l h_vmem=12G
 #$ -R y
-
+#$ -o /home/asd2007/joblogs
 
 ########### SETTINGS ###########
-TRIM=1 # 
+TRIM=0 # 
 NUC=0 # run nucleoatac, extended runtime required
-BT2ALN=1 # bt2 recommnded!
+BT2ALN=0 # bt2 recommnded!
+ATHENA=1
 ##############################
 
 
 path=$1 #path to all the Samples
 gtf_path=$2 #Number indicating the reference gtf [1 for Human 2 for Mouse 3 for other]
-
-echo "requirements: deeptools, python 2.7, macs2, picard, java, sambamba, bwa, ucsc-tools"
 
 # Uses job array for each Sample in the folder
 file=$(ls ${path} | tail -n +${SGE_TASK_ID}| head -1)
@@ -65,32 +64,45 @@ echo "Processing  $Sample ..."
 
 #Figuring out the Reference genome
 
+
+if [ $ATHENA == 1 ]
+then
+    REFDIR="/athena/elementolab/scratch/asd2007/Reference"
+    ANNOTDIR="/athena/elementolab/scratch/asd2007/Reference"
+    PICARDCONF="/home/asd2007/Scripts/picardmetrics.athena.conf"
+else
+    REFDIR="/zenodotus/dat01/melnick_bcell_scratch/asd2007/Reference"
+    ANNOTDIR="/zenodotus/dat01/melnick_bcell_scratch/asd2007/Reference"
+    PICARDCONF="/home/asd2007/Scripts/picardmetrics.conf"
+fi
+
 if [ $gtf_path == 1 ]
 then
-	#gtf="/zenodotus/dat02/elemento_lab_scratch/oelab_scratch_scratch007/akv3001/mm10_UCSC_ref.gtf"
-	REF="/zenodotus/dat02/elemento_lab_scratch/oelab_scratch_scratch007/akv3001/Genomes/Homo_sapiens/UCSC/hg19/Sequence/BWAIndex"
-	REFbt2="/zenodotus/dat02/elemento_lab_scratch/oelab_scratch_scratch007/akv3001/Genomes/Homo_sapiens/UCSC/hg19/Sequence/Bowtie2Index"
+    #gtf="/zenodotus/dat02/elemento_lab_scratch/oelab_scratch_scratch007/akv3001/mm10_UCSC_ref.gtf"
+	REF="${REFDIR}/Homo_sapiens/UCSC/hg19/Sequence/BWAIndex"
+	REFbt2="${REFDIR}/Homo_sapiens/UCSC/hg19/Sequence/Bowtie2Index"
    # REFbt="/home/asd20i07/dat02/asd2007/Reference/Homo_sapiens/UCSC/mm10/Sequence/BowtieIndex/genome"
-    BLACK="/home/asd2007/dat02/asd2007/Reference/encodeBlack.bed"
-    #BLACK="/home/asd2007/melnick_bcell_scratch/asd2007/Reference/hg19/Anshul_Hg19UltraHighSignalArtifactRegions.bed"
-    #chrsz="/home/asd2007/melnick_bcell_scratch/asd2007/Reference/hg19.genome.chrom.sizes"
+  #BLACK="${REFDIR}/encodeBlack.bed"
+  BLACK="${REFDIR}/hg19/wgEncodeDacMapabilityConsensusExcludable.bed.gz" \
+    #BLACK="/athena/elementolab/scratch/asd2007/Reference/hg19/Anshul_Hg19UltraHighSignalArtifactRegions.bed"
+    #chrsz="/athena/elementolab/scratch/asd2007/Reference/hg19.genome.chrom.sizes"
     fetchChromSizes hg19 > hg19.chrom.sizes
     chrsz= $PWD/hg19.chrom.sizes
     RG="hg19"
     SPEC="hs"
-    REFGen="/home/asd2007/melnick_bcell_scratch/asd2007/bin/bcbio/genomes/Hsapiens/hg19/seq/"
-    rsync -av /home/asd2007/Scripts/picardmetrics.conf ./
+    REFGen="/athena/elementolab/scratch/asd2007/bin/bcbio/genomes/Hsapiens/hg19/seq/"
+    rsync -av ./
 
 elif [ $gtf_path == 2 ]
 then
 	gtf="/zenodotus/dat02/elemento_lab_scratch/oelab_scratch_scratch007/akv3001/Mus_UCSC_ref.gtf"
 	REF="/zenodotus/dat02/elemento_lab_scratch/oelab_scratch_scratch007/akv3001/Genomes/Mus_musculus/UCSC/mm10/Sequence/BWAIndex"
     REFbt2="/zenodotus/dat02/elemento_lab_scratch/oelab_scratch_scratch007/akv3001/Genomes/Mus_musculus/UCSC/mm10/Sequence/Bowtie2Index"
-    BLACK="/home/asd2007/dat02/asd2007/Reference/mm10-blacklist.bed"
+    BLACK="/athena/elementolab/scratch/asd2007/Reference/mm10-blacklist.bed"
     RG="mm10"
     SPEC="mm"
-    REFGen="/home/asd2007/melnick_bcell_scratch/asd2007/bin/bcbio/genomes/Mmusculus/mm10/seq/"
-    #chrsz="/home/asd2007/melnick_bcell_scratch/asd2007/Reference/mm10.genome.chrom.sizes"
+    REFGen="/athena/elementolab/scratch/asd2007/bin/bcbio/genomes/Mmusculus/mm10/seq/"
+    #chrsz="/athena/elementolab/scratch/asd2007/Reference/mm10.genome.chrom.sizes"
     fetchChromSizes mm10 > mm10.chrom.sizes
     chrsz= $PWD/mm10.chrom.sizes
     rsync -av /home/asd2007/Scripts/picardmetrics.Mouse.conf ./
@@ -105,7 +117,7 @@ rsync -avP ${REF} $TMPDIR/
 
 rsync -avP ${REFbt2} $TMPDIR/
 
-mkdir ${TMPDIR}/${Sample}
+mkdir -p ${TMPDIR}/${Sample}
 
 echo "ls of pwd is"
 ls -lrth
@@ -118,21 +130,22 @@ then
 
 #    cat *_val_1.fq.gz > ${Sample}.R1.fastq.gz
  #   cat *_val_2.fq.gz > ${Sample}.R2.fastq.gz
-    cat *_R2* >  ${Sample}.R2.fastq.gz
-    cat *_R1* > ${Sample}.R1.fastq.gz
-    #cat *R2* >  ${Sample}.R2.fastq.gz
+   # cat *_R2* >  ${Sample}.R2.fastq.gz
+    cat *_R1*.fastq.gz > ${Sample}.R1.fastq.gz
+    cat *_R2*.fastq.gz > ${Sample}.R2.fastq.gz
     trimAdapters.py -a ${Sample}.R1.fastq.gz -b ${Sample}.R2.fastq.gz
     echo "completed trimming"
+    rm ${Sample}.R1.fastq.gz
+    rm ${Sample}.R2.fastq.gz
     pigz -p $NSLOTS -c $TMPDIR/${Sample}.R1.trim.fastq > $TMPDIR/${Sample}.R1.trim.fastq.gz
     pigz -p $NSLOTS -c $TMPDIR/${Sample}.R2.trim.fastq > $TMPDIR/${Sample}.R2.trim.fastq.gz
-    rsync -av $TMPDIR/${Sample}.R*.trim.fastq.gz ${path}/${Sample}
+    rsync -av $TMPDIR/${Sample}.R1.trim.fastq.gz ${path}/${Sample}
+    rsync -av $TMPDIR/${Sample}.R2.trim.fastq.gz ${path}/${Sample}
 else
     echo "will not perform adapter sequence trimming of reads"
     #gunzip *.gz
       #mv ${Sample}.R1.fastq $TMPDIR/${Sample}.R1.trim.fastq
       #mv ${Sample}.R2.fastq $TMPDIR/${Sample}.R2.trim.fastq
-    # mv $TMPDIR/R2/${Sample}.R2.fastq $TMPDIR/R2/${Sample}.R2.trim.fastq
-    # mv $TMPDIR/R1/${Sample}.R1.fastq $TMPDIR/R1/${Sample}.R1.trim.fastq
 fi
 
 
@@ -151,30 +164,30 @@ then
 else
     echo "----------bwa-mem aligning-------------"
    # echo "aligning : $TMPDIR/${Sample}.R1.trim.fq ,  $TMPDIR/${Sample}.R2.trim.fq using bwa-mem.."
-   # bwa mem -t ${NSLOTS} -M $TMPDIR/BWAIndex/genome.fa $TMPDIR/${Sample}.R1.trim.fastq $TMPDIR/${Sample}.R2.trim.fastq | samtools view -bS - >  $TMPDIR/${Sample}.bam
+  # bwa mem -t ${NSLOTS} -M $TMPDIR/BWAIndex/genome.fa $TMPDIR/${Sample}.R1.trim.fastq $TMPDIR/${Sample}.R2.trim.fastq | samtools view -bS - >  $TMPDIR/${Sample}.bam
 fi
 
 echo "----------Processing alignment and filtering for duplicates and mitochondrial mapping reads-----------------"
 
 processBamAlignment.sh $TMPDIR/${Sample}/${Sample}.bam
 
-samtools sort -n $TMPDIR/${Sample}/${Sample}.sorted.nodup.noM.black.bam -o $TMPDIR/${Sample}/${Sample}.nsorted.nodup.noM.black.bam
-FINAL_BAM='${TMPDIR}/${Sample}/${Sample}.sorted.nodup.noM.black.bam'
+samtools sort -n $TMPDIR/${Sample}/${Sample}.sorted.nodup.noM.bam -o $TMPDIR/${Sample}/${Sample}.nsorted.nodup.noM.bam
+FINAL_BAM='${TMPDIR}/${Sample}/${Sample}.sorted.nodup.noM.bam'
 
-echo "--------------------------Tn5 adjusted bedfile for MACS2 peak calling---------------------------"
 
-samtools fixmate $TMPDIR/${Sample}/${Sample}.nsorted.nodup.noM.black.bam $TMPDIR/${Sample}/${Sample}.nsorted.fixmate.nodup.noM.black.bam
+samtools fixmate $TMPDIR/${Sample}/${Sample}.nsorted.nodup.noM.bam $TMPDIR/${Sample}/${Sample}.nsorted.fixmate.nodup.noM.bam
 
-convertBAMtoBED.sh $TMPDIR/${Sample}/${Sample}.nsorted.fixmate.nodup.noM.black.bam
+convertBAMtoBED.sh $TMPDIR/${Sample}/${Sample}.nsorted.fixmate.nodup.noM.bam
 
 samtools view -H $TMPDIR/${Sample}/${Sample}.sorted.nodup.noM.bam | grep chr | grep -v chrM | /home/ole2001/PERL_SCRIPTS/columns.pl 1 2 | sed 's/SN://' | sed 's/LN://' > chrom.sizes
 
-#TMPDIR/${Sample}/${Sample}.nsorted.fixmate.nodup.noM.black.bam
+#TMPDIR/${Sample}/${Sample}.nsorted.fixmate.nodup.noM.bam
 
 
-echo "------------------------------------------Call Peaks with MACS2 ON PSEUDOREPLICTES--------------------------------------------"
+echo "----------Finsihed Processing Bam Files-----------------"
 
-callPeaks.sh $TMPDIR/${Sample}/${Sample}.nsorted.fixmate.nodup.noM.black.bedpe.gz ${Sample} hs
+rsync -avP $TMPDIR/${Sample} $path/${Sample}
+rsync -r -a -v $TMPDIR/${Sample} $path/${Sample}
 
 #adjustedBed="/home/ole2001/PROGRAMS/SOFT/bedtools2/bin/slopBed -i $TMPDIR/${Sample}/${Sample}.sorted.nodup.noM.black.bed -g sizes -l 75 -r -75 -s"
 
@@ -183,32 +196,51 @@ callPeaks.sh $TMPDIR/${Sample}/${Sample}.nsorted.fixmate.nodup.noM.black.bedpe.g
 
 echo "------------------------------------------Call Peaks with MACS2--------------------------------------------"
 
-macs2 callpeak -t  $TMPDIR/${Sample}/${Sample}.nsorted.fixmate.nodup.noM.black.Tn5.tagAlign.gz -f BED -n $TMPDIR/${Sample}/${Sample}.tag.narrow -g $SPEC  --nomodel --shift -75 --extsize 150 --keep-dup all --bdg --SPMR --call-summits -p 1e-3
+cp $TMPDIR/${Sample}/${Sample}.nsorted.fixmate.nodup.noM.tn5.tagAlign.gz  $TMPDIR/${Sample}/${Sample}.nodup.tn5.tagAlign.gz
+
+cp $TMPDIR/${Sample}/${Sample}.nsorted.fixmate.nodup.noM.bedpe.gz $TMPDIR/${Sample}/${Sample}.nodup.bedpe.gz
+
+macs2 callpeak -t  $TMPDIR/${Sample}/${Sample}.nodup.tn5.tagAlign.gz -f BED -n $TMPDIR/${Sample}/${Sample}.tag.narrow -g $SPEC  --nomodel --shift -75 --extsize 150 --keep-dup all --bdg --SPMR --call-summits -p 1e-2
+
+/home/asd2007/ATACseq/narrowpeak.py $TMPDIR/${Sample}/${Sample}.tag.narrow_peaks.narrowPeak $TMPDIR/${Sample}/${Sample}.tn5.narrowPeak.gz 
 
 sort -k 8gr,8gr $TMPDIR/${Sample}/${Sample}.tag.narrow_peaks.narrowPeak | awk 'BEGIN{OFS="\t"}{$4="Peak_"NR ; print $0}' | gzip -nc > $TMPDIR/${Sample}/${Sample}.tn5.pf.narrowPeak.gz
 
-macs2 callpeak -t  $TMPDIR/${Sample}/${Sample}.nsorted.fixmate.nodup.noM.black.Tn5.tagAlign.gz -f BED -n $TMPDIR/${Sample}/${Sample}.tag.broad -g $SPEC  --nomodel --shift -75 --extsize 150 --keep-dup all --broad --broad-cutoff 0.1
+zcat $TMPDIR/${Sample}/${Sample}.tn5.pf.narrowPeak.gz | sort -grk8 | head -n 500000 | gzip -c > $$TMPDIR/${Sample}/${Sample}.tn5.pval0.01.500k.narrowPeak.gz
+
+## BROAD peaks ##
+macs2 callpeak -t  $TMPDIR/${Sample}/${Sample}.nsorted.fixmate.nodup.noM.tn5.tagAlign.gz -f BED -n $TMPDIR/${Sample}/${Sample}.tag.broad -g $SPEC  --nomodel --shift -75 --extsize 150 --keep-dup all --broad --broad-cutoff 0.1
 
 sort -k 8gr,8gr $TMPDIR/${Sample}/${Sample}.tag.broad_peaks.broadPeak | awk 'BEGIN{OFS="\t"}{$4="Peak_"NR ; print $0}' | gzip -nc > $TMPDIR/${Sample}/${Sample}.tn5.pf.broadPeak.gz
 
 sort -k 14gr,14gr $TMPDIR/${Sample}/${Sample}.tag.broad_peaks.gappedPeak | awk 'BEGIN{OFS="\t"}{$4="Peak_"NR ; print $0}' | gzip -nc > $TMPDIR/${Sample}/${Sample}.tn5.pf.gappedPeak.gz
 
 
+
+echo "------------------------------------------Call Peaks with MACS2 ON PSEUDOREPLICTES--------------------------------------------"
+
+callPeaks.sh $TMPDIR/${Sample}/${Sample}.nodup.bedpe.gz ${Sample} hs
+
+mkdir -p $TMPDIR/${Sample}/bamPE
+
 #macs2 callpeak -t  $TMPDIR/${Sample}/${Sample}.nsorted.fixmate.nodup.noM.black.bedpe.gz -f BEDPE -n $TMPDIR/${Sample}/${Sample}.bedpe.narrow -g $SPEC  --nomodel --shift -75 --extsize 150 --keep-dup all --call-summits -p 1e-3
 
-#macs2 callpeak -t $TMPDIR/${Sample}/${Sample}.sorted.nodup.noM.black.bam -f BAMPE -n $TMPDIR/${Sample}/${Sample}.narrow -g $SPEC --nomodel --shift -75 --extsize 150 --keep-dup all --call-summits -p 1e-3
+#macs2 callpeak -t $TMPDIR/${Sample}/${Sample}.sorted.nodup.noM.bam -f BAMPE -n $TMPDIR/${Sample}/bamPE/${Sample}.bampe -g $SPEC --nomodel --keep-dup all --call-summits -p 1e-1 --bdg --SPMR
+#
+#macs2 callpeak -t $TMPDIR/${Sample}/${Sample}.sorted.nodup.noM.bam -f BAMPE -n $TMPDIR/${Sample}/bamPE/${Sample}.broad -g $SPEC  --nomodel --shift -75 --extsize 150 --keep-dup all --broad --broad-cutoff 0.1
+#
 
-#macs2 callpeak -t $TMPDIR/${Sample}/${Sample}.sorted.nodup.noM.black.bam -f BAMPE -n $TMPDIR/${Sample}/${Sample}.broad -g $SPEC  --nomodel --shift -75 --extsize 150 --keep-dup all --broad --broad-cutoff 0.1
+
 
 
 #macs2 callpeak -t ${TMPDIR}/${Sample}/${Sample}.sorted.nodup.noM.frag123.bam -f BAMPE -n $TMPDIR/${Sample}/${Sample}.frag123.narrow -g hs --nomodel --shift -75 --extsize 150 --keep-dup all --call-summits -p 1e-3
 
 ## lenient threshold for IDR
-#macs2 callpeak -t $TMPDIR/${Sample}/${Sample}.sorted.nodup.noM.black.bam -f BAMPE -n $TMPDIR/${Sample}/${Sample}.narrow.p0.01 -g hs --nomodel --shift -75 --extsize 150 --keep-dup all --call-summits -p 1e-1
+#macs2 callpeak -t $TMPDIR/${Sample}/${Sample}.sorted.nodup.noM.bam -f BAMPE -n $TMPDIR/${Sample}/${Sample}.narrow.p0.01 -g hs --nomodel --shift -75 --extsize 150 --keep-dup all --call-summits -p 1e-1
 
-#macs2 callpeak -t $TMPDIR/${Sample}/${Sample}.sorted.nodup.noM.black.bam -f BAMPE -n $TMPDIR/${Sample}/${Sample}.broad.p0.1 -g hs  --nomodel --shift -100 --extsize 200 --keep-dup all --broad --broad-cutoff 0.1
+#macs2 callpeak -t $TMPDIR/${Sample}/${Sample}.sorted.nodup.noM.bam -f BAMPE -n $TMPDIR/${Sample}/${Sample}.broad.p0.1 -g hs  --nomodel --shift -100 --extsize 200 --keep-dup all --broad --broad-cutoff 0.1
 #rsync -avP /zenodotus/dat02/elemento_lab_scratch/oelab_scratch_scratch007/akv3001/Genomes/Mus_musculus/UCSC/mm10/Sequence/WholeGenomeFasta/genome.* ./
-#rsync -avP /home/asd2007/dat02/asd2007/Reference/Homo_sapiens/UCSC/hg19/Sequence/WholeGenomeFasta/genome.* ./
+#rsync -avP /athena/elementolab/scratch/asd2007/Reference/Homo_sapiens/UCSC/hg19/Sequence/WholeGenomeFasta/genome.* ./
 prefix=$TMPDIR/${Sample}/${Sample}.narrow
 
 #macs2 bdgcmp -t ${prefix}_treat_pileup.bdg -c ${prefix}_control_lambda.bdg
@@ -226,7 +258,7 @@ prefix=$TMPDIR/${Sample}/${Sample}.narrow
 
 #echo "--- deeptools coverage -rpkm --"
 
-#bamCoverage --bam $TMPDIR/${Sample}/${Sample}.sorted.nodup.noM.black.bam --binSize 5 \
+#bamCoverage --bam $TMPDIR/${Sample}/${Sample}.sorted.nodup.noM.bam --binSize 5 \
 #    --outFileFormat bigwig --smoothLength 200  \
 #    --normalizeUsingRPKM \
 #    -o $TMPDIR/${Sample}/${Sample}.bamCov.rpkm.bw --centerReads --numberOfProcessors ${NSLOTS}
@@ -241,75 +273,66 @@ mkdir -p ${Sample}/QCmetrics/raw
 
 mkdir -p ${Sample}/QCmetrics/filtered
 
+pyatac sizes --bam $TMPDIR/${Sample}/${Sample}.sorted.nodup.noM.bam --upper 1000 --out $TMPDIR/${Sample}/QCmetrics/${Sample}.filtered
 
+picardmetrics run -f $PICARDCONF -o $TMPDIR/${Sample}/QCmetrics/raw $TMPDIR/${Sample}/${Sample}.sorted.bam
 
-pyatac sizes --bam $TMPDIR/${Sample}/${Sample}.sorted.nodup.noM.black.bam --upper 1000 --out $TMPDIR/${Sample}/QCmetrics/${Sample}.filtered
-
-
-picardmetrics run -o $TMPDIR/${Sample}/QCmetrics/raw $TMPDIR/${Sample}/${Sample}.sorted.bam
-
-picardmetrics run -o $TMPDIR/${Sample}/QCmetrics/filtered $TMPDIR/${Sample}/${Sample}.sorted.nodup.noM.black.bam
+picardmetrics run -f $PICARDCONF -o $TMPDIR/${Sample}/QCmetrics/filtered $TMPDIR/${Sample}/${Sample}.sorted.nodup.noM.bam
 
 cp $TMPDIR/${Sample}/QCmetrics/filtered/*.EstimateLibraryComplexity.log $TMPDIR/${Sample}/QCmetrics/${Sample}.picardcomplexity.qc
-
 cp $TMPDIR/${Sample}/QCmetrics/filtered/*.EstimateLibraryComplexity.log $TMPDIR/${Sample}/${Sample}.picardcomplexity.qc
 
 samtools flagstat  $TMPDIR/${Sample}/${Sample}.sorted.bam > $TMPDIR/${Sample}/QCmetrics/raw/${Sample}.sorted.flagstat.txt
-
 samtools flagstat $TMPDIR/${Sample}/${Sample}.sorted.nodup.noM.bam > $TMPDIR/${Sample}/QCmetrics/filtered/${Sample}.sorted.nodup.noM.flagstat.txt
 
-getchrM $TMPDIR/${Sample}/${Sample}.sorted.nodup.noM.black.bam > $TMPDIR/${Sample/}QCmetrics/${Sample}.sorted.nodup.noM.black.bam.chrM.txt
-
-
+getchrM $TMPDIR/${Sample}/${Sample}.sorted.nodup.noM.bam > $TMPDIR/${Sample/}QCmetrics/${Sample}.sorted.nodup.noM.bam.chrM.txt
 getchrM $TMPDIR/${Sample}/${Sample}.sorted.bam > $TMPDIR/$Sample}/QCmetrics/${Sample}.sorted.bam.chrM.txt
 
 
 echo "----------- compute fragment midpoint coverage per bp ------------------"
-#pyatac cov --bam $TMPDIR/${Sample}/${Sample}.sorted.nodup.noM.black.bam --out $TMPDIR/${Sample}/${Sample}.pyatac.cov --cores ${NSLOTS}
+#pyatac cov --bam $TMPDIR/${Sample}/${Sample}.sorted.nodup.noM.bam --out $TMPDIR/${Sample}/${Sample}.pyatac.cov --cores ${NSLOTS}
 
-#pyatac cov --bam $TMPDIR/${Sample}/${Sample}.sorted.nodup.noM.black.bam --out $TMPDIR/${Sample}/${Sample}.pyatac.125bp.cov --cores ${NSLOTS} --upper 125
+#pyatac cov --bam $TMPDIR/${Sample}/${Sample}.sorted.nodup.noM.bam --out $TMPDIR/${Sample}/${Sample}.pyatac.125bp.cov --cores ${NSLOTS} --upper 125
 
-bamCoverage --bam $TMPDIR/${Sample}/${Sample}.sorted.nodup.noM.black.bam --binSize 5 \
-    --outFileFormat bigwig --smoothLength 150 \
-    --normalizeUsingRPKM \
-    --maxFragmentLength 300 \
-    -o $TMPDIR/${Sample}/${Sample}.smooth151.center.extend.fpkm.max300.bw --centerReads --extendReads --numberOfProcessors ${NSLOTS}
+#bamCoverage --bam $TMPDIR/${Sample}/${Sample}.sorted.nodup.noM.bam --binSize 5 \
+#    --outFileFormat bigwig --smoothLength 150 \
+#    --normalizeUsingRPKM \
+#    --maxFragmentLength 300 \
+#    -o $TMPDIR/${Sample}/${Sample}.smooth151.center.extend.fpkm.max300.bw --centerReads --extendReads --numberOfProcessors ${NSLOTS}
 
 
-bamCoverage --bam $TMPDIR/${Sample}/${Sample}.sorted.nodup.noM.black.bam --binSize 5 \
+bamCoverage --bam $TMPDIR/${Sample}/${Sample}.sorted.nodup.noM.bam --binSize 5 \
             --outFileFormat bigwig --smoothLength 150 \
             --normalizeUsingRPKM \
             --maxFragmentLength 150 \
-            -o $TMPDIR/${Sample}/${Sample}.smooth151.center.extend.fpkm.max115.bw --centerReads --extendReads --numberOfProcessors ${NSLOTS}
+            -o $TMPDIR/${Sample}/${Sample}.smooth150.center.extend.fpkm.max150.bw --centerReads --extendReads --numberOfProcessors ${NSLOTS}
 
 
-#bamCoverage --bam $TMPDIR/${Sample}/${Sample}.sorted.nodup.noM.black.bam --binSize 20 \
+#bamCoverage --bam $TMPDIR/${Sample}/${Sample}.sorted.nodup.noM.bam --binSize 20 \
 #    --outFileFormat bigwig --smoothLength 150 \
 #    --normalizeUsingRPKM \
 #    -o $TMPDIR/${Sample}/${Sample}.bin20.smooth150.fpkm.bw --numberOfProcessors ${NSLOTS}
 
-rsync -avP $TMPDIR/${Sample} $path/${Sample}
 rsync -r -a -v $TMPDIR/${Sample} $path/${Sample}
 
 
 
 
+# Peak atlas using Chang data and B cells
+#BED="/athena/elementolab/scratch/asd2007/Projects/DataSets/atacData/ATAC-AML/AML/cellAtlas.bed"
+#BED="/athena/elementolab/scratch/asd2007/Projects/DataSets/atacData/atacCN1/project/cellAtlas.CN1.bed"
 
-BED="/home/asd2007/dat02/asd2007/Projects/DataSets/atacData/ATAC-AML/AML/cellAtlas.bed"
-#BED="/home/asd2007/dat02/asd2007/Projects/DataSets/atacData/atacCN1/project/cellAtlas.CN1.bed"
 
-
-pyatac counts --bam  $TMPDIR/${Sample}/${Sample}.sorted.nodup.noM.black.bam --bed ${BED} --out $TMPDIR/${Sample}/${Sample}.ins --upper 200
+#pyatac counts --bam  $TMPDIR/${Sample}/${Sample}.sorted.nodup.noM.bam --bed ${BED} --out $TMPDIR/${Sample}/${Sample}.150.ins --upper 150
 ##bedtools multicov -split -bams $BAMS -bed $BED
 
-LIBS=$(zcat ${Sample}/${Sample}.ins.counts.txt.gz  | awk '{sum +=$1} END  {printf sum}')
+#pyatac counts --bam  $TMPDIR/${Sample}/${Sample}.sorted.nodup.noM.bam --bed ${BED} --out $TMPDIR/${Sample}/${Sample}.ins
+#LIBS=$(zcat ${Sample}/${Sample}.ins.counts.txt.gz  | awk '{sum +=$1} END  {printf sum}')
 
 #let KM=2000000 #1 million * bin size in kb
 #let LIBZ=$LIBS/$KM
 
-
-
-#bamCoverage --bam  $TMPDIR/${Sample}/${Sample}.sorted.nodup.noM.black.bam --binSize 20 \
+#bamCoverage --bam  $TMPDIR/${Sample}/${Sample}.sorted.nodup.noM.bam --binSize 20 \
 #    --outFileFormat bigwig --smoothLength 150  \
 #    --scaleFactor $LIBZ \
 #    -o ${TMPDIR}/${Sample}/$Sample.readsInPeaks.bin20.centered.smooth.150.max150f.bw --numberOfProcessors ${NSLOTS} \
@@ -318,7 +341,7 @@ LIBS=$(zcat ${Sample}/${Sample}.ins.counts.txt.gz  | awk '{sum +=$1} END  {print
 
 
 
-#bamCoverage --bam ${TMPDIR}/${Sample}/${Sample}.sorted.nodup.noM.black.bam --binSize 20 \
+#bamCoverage --bam ${TMPDIR}/${Sample}/${Sample}.sorted.nodup.noM.bam --binSize 20 \
 #    --outFileFormat bigwig --smoothLength 150  \
 #    --scaleFactor $LIBZ \
 #    -o ${TMPDIR}/$Sample/$Sample.readsInPeaks.bin20.centered.smooth.150.max500f.bw --numberOfProcessors ${NSLOTS} \
@@ -326,18 +349,18 @@ LIBS=$(zcat ${Sample}/${Sample}.ins.counts.txt.gz  | awk '{sum +=$1} END  {print
 #    --centerReads --extendReads
 
 
-let KM=500000 #1 million * bin size in kb
-let LIBZ=$LIBS/$KM
+#let KM=50000 #1 million * bin size in kb
+#let LIBZ=$LIBS/$KM#
 
-bamCoverage --bam ${TMPDIR}/${Sample}/${Sample}.sorted.nodup.noM.black.bam --binSize 5 \
-    --outFileFormat bigwig --smoothLength 150  \
-    --scaleFactor $LIBZ \
-    -o ${TMPDIR}/$Sample/$Sample.readsInPeaks.bin5.centered.smooth.150.max200.bw --numberOfProcessors ${NSLOTS} \
-    --maxFragmentLength 200 \
-    --centerReads --extendReads
+##bamCoverage --bam ${TMPDIR}/${Sample}/${Sample}.sorted.nodup.noM.bam --binSize 5 \
+##    --outFileFormat bigwig --smoothLength 150  \
+# #   --scaleFactor $LIBZ \
+#    -o ${TMPDIR}/$Sample/$Sample.readsInPeaks.bin5.centered.smooth.150.max200.bw --numberOfProcessors ${NSLOTS} \
+#    --maxFragmentLength 150 \
+#    --centerReads --extendReads
 
 
-#bamCoverage --bam ${TMPDIR}/$Sample/${Sample}.sorted.nodup.noM.black.bam --binSize 5 \
+#bamCoverage --bam ${TMPDIR}/$Sample/${Sample}.sorted.nodup.noM.bam --binSize 5 \
 #    --outFileFormat bigwig --smoothLength 150  \
 #    --scaleFactor $LIBZ \
 #    -o ${TMPDIR}/$Sample/$Sample.readsInPeaks.bin5.centered.smooth.150.max500.bw --numberOfProcessors ${NSLOTS} \
@@ -345,48 +368,82 @@ bamCoverage --bam ${TMPDIR}/${Sample}/${Sample}.sorted.nodup.noM.black.bam --bin
 #    --centerReads --extendReads
     #pyatac ins --bam $bam --bed $bed --
 
-rsync -avP $TMPDIR/${Sample} $path/${Sample}
 rsync -r -a -v $TMPDIR/${Sample} $path/${Sample}
 
-mkdir -p /home/asd2007/melnick_bcell_scratch/asd2007/COVERAGE/AWS.OE/${Sample}
-rsync -r -a -v $TMPDIR/${Sample}/*.bw  /home/asd2007/melnick_bcell_scratch/asd2007/COVERAGE/AWS.OE/${Sample}
+mkdir -p /athena/elementolab/scratch/asd2007/Projects/DataSets/COVERAGE
+
+mkdir -p /athena/elementolab/scratch/asd2007/Projects/DataSets/COVERAGE/AWS.OE
+
+mkdir -p /athena/elementolab/scratch/asd2007/Projects/DataSets/COVERAGE/AWS.OE/${Sample}
+
+rsync -r -a -v $TMPDIR/${Sample}/*.bw  /athena/elementolab/scratch/asd2007/Projects/DataSets/COVERAGE/AWS.OE/${Sample}
+
+
+
 
 #path="/zenodotus/dat02/elemento_lab_scratch/oelab_scratch_scratch007/akv3001/Jon_bwa_mm10_output"
 
 #rsync -r -v $TMPDIR/${Sample}* /zenodotus/dat01/melnick_bcell_scratch/asd2007/COVERAGE/ATAC/test/peaksNorm/
 
+# fixing bug that removed sorted bam when cleaning up
+sambamba sort --nthreads --memory-limit 40GB \
+         --nthreads ${NSLOTS} --tmpdir ${TMPDIR} --out ${TMPDIR}/${Sample}/${Sample}.bam ${TMPDIR}/${Sample}/${Sample}.bam
+
+samtools index $TMPDIR/${Sample}/${Sample}.sorted.bam 
+
+cp $TMPDIR/${Sample}/${Sample}.sorted.bam $TMPDIR/${Sample}/${Sample}.bam
+
+cp $TMPDIR/${Sample}/${Sample}.sorted.bam.bai $TMPDIR/${Sample}/${Sample}.bam.bai
+
+mkdir ${Sample}/IDR
+
+### IDR
+
+source activate bds_atac_py3
+
+~/ATACseq/getIDR.sh   $TMPDIR/${Sample}/pseudo_reps/${Sample}.nodup.pr1.tn5.pval0.1.500k.narrowPeak.gz $TMPDIR/${Sample}/pseudo_reps/${Sample}.nodup.pr2.tn5.pval0.1.500k.narrowPeak.gz ${Sample}/pseudo_reps/${Sample}.nodup.tn5.pooled.pf.pval0.1.500K.naive_overlap.narrowPeak.gz  $TMPDIR/${Sample}/IDR/${Sample}.IDR.txt
+
+
+rsync -avP $TMPDIR/${Sample} $path/${Sample}
+rsync -r -a -v $TMPDIR/${Sample} $path/${Sample}
+
+source deactivate
+
+#################
+################
+#### ATACqc ##
 
 
 
 
 
+if [ $ATHENA == 1 ]
+then
+    REFDIR="/athena/elementolab/scratch/asd2007/Reference"
+    ANNOTDIR="/athena/elementolab/scratch/asd2007/Reference"
+else
+    REFDIR="/zenodotus/dat01/melnick_bcell_scratch/asd2007/Reference"
+    ANNOTDIR="/zenodotus/dat01/melnick_bcell_scratch/asd2007/Reference"
+fi
 
 
+FINAL_BED="${PWD}/${Sample}/${Sample}.nsorted.fixmate.nodup.noM.black.Tn5.tagAlign.gz"
 
-
-
-
-
-
-
-
-
-Sample="sample_LY7"
-FINAL_BAM="${Sample}/${Sample}.sorted.nodup.noM.black.bam"
-FINAL_BED="${Sample}/${Sample}.nsorted.fixmate.nodup.noM.black.Tn5.tagAlign.gz"
-
-WORKDIR="${Sample}"
-OUTDIR="${WORKDIR}/QCmetrics/atacqc"
-OUTPREFIX="${Sample}"
-INPREFIX="$Sample"
+ALIGNED_BAM="${PWD}/${Sample}/${Sample}.bam"
+WORKDIR=$PWD
+OUTDIR="qc"
+OUTPREFIX=$Sample
+INPREFIX=$Sample
 GENOME='hg19' # This is the only genome that currently works
 
 SAMPLE="$Sample"
 # Annotation files
+
 ANNOTDIR="/home/asd2007/melnick_bcell_scratch/asd2007/Reference"
-X="/home/asd2007/melnick_bcell_scratch/asd2007/Reference/hg19/"
+#ANNOTDIR="/athena/elementolab/scratch/asd2007/Reference"
+
 DNASE_BED="${ANNOTDIR}/${GENOME}/reg2map_honeybadger2_dnase_all_p10_ucsc.bed.gz"
-BLACKLIST_BED="/home/asd2007/melnick_bcell_scratch/asd2007/Reference/hg19/wgEncodeDacMapabilityConsensusExcludable.bed.gz"
+BLACKLIST_BED="${ANNOTDIR}/${GENOME}/wgEncodeDacMapabilityConsensusExcludable.bed.gz"
 TSS_BED="${ANNOTDIR}/${GENOME}/hg19_RefSeq_stranded.bed.gz"
 REF_FASTA="${ANNOTDIR}/${GENOME}/encodeHg19Male.fa"
 PROM="${ANNOTDIR}/${GENOME}/reg2map_honeybadger2_dnase_prom_p2.bed.gz"
@@ -394,34 +451,87 @@ ENH="${ANNOTDIR}/${GENOME}/reg2map_honeybadger2_dnase_enh_p2.bed.gz"
 REG2MAP="${ANNOTDIR}/${GENOME}/dnase_avgs_reg2map_p10_merged_named.pvals.gz"
 ROADMAP_META="${ANNOTDIR}/${GENOME}/eid_to_mnemonic.txt"
 PBC="${WORKDIR}/$SAMPLE.pbc.qc"
+
+
+
+
+
+
+
+
+
+#################
+################
+#### ATACqc ##
+
+
+
+
+#FINAL_BAM="${Sample}/${Sample}.sorted.nodup.noM.bam"
+#FINAL_BED="${Sample}/${Sample}.nodup.tn5.tagAlign.gz"
+#ALIGNED_BAM="${PWD}/${Sample}/${Sample}.bam"
+#WORKDIR=$PWD
+#OUTDIR="qc"
+
+
+
+
+
+GENOME='hg19' # This is the only genome that currently works
+SAMPLE="$Sample"
+
+PBC="${WORKDIR}/$SAMPLE.pbc.qc"
+FINAL_BAM="${Sample}/${Sample}.sorted.nodup.noM.bam"
+FINAL_BED="${Sample}/${Sample}.nodup.tn5.tagAlign.gz"
+
 F1="${Sample}.R1.trim.fastq.gz"
 F2="${Sample}.R2.trim.fastq.gz"
+ALIGNED_BAM="${Sample}/${Sample}.sorted.bam"
+WORKDIR=$PWD
+OUTDIR="qc"
+OUTPREFIX=$Sample
+INPREFIX=$Sample
+GENOME='hg19' # This is the only genome that currently works
+
+# Annotation files
+X="/athena/elementolab/scratch/asd2007/Reference/hg19/"
+DNASE_BED="${ANNOTDIR}/${GENOME}/reg2map_honeybadger2_dnase_all_p10_ucsc.bed.gz"
+BLACKLIST_BED="${ANNOTDIR}/${GENOME}/wgEncodeDacMapabilityConsensusExcludable.bed.gz"
+TSS_BED="${ANNOTDIR}/${GENOME}/hg19_RefSeq_stranded.bed.gz"
+REF_FASTA="${ANNOTDIR}/${GENOME}/encodeHg19Male.fa"
+PROM="${ANNOTDIR}/${GENOME}/reg2map_honeybadger2_dnase_prom_p2.bed.gz"
+ENH="${ANNOTDIR}/${GENOME}/reg2map_honeybadger2_dnase_enh_p2.bed.gz"
+REG2MAP="${ANNOTDIR}/${GENOME}/dnase_avgs_reg2map_p10_merged_named.pvals.gz"
+ROADMAP_META="${ANNOTDIR}/${GENOME}/eid_to_mnemonic.txt"
 
 
-python $HOME/dat02/asd2007/TOOLS/ataqc/run_ataqc.py --workdir ${Sample} \
-    --outdir ${Sample} \
+#cp "${Sample}/${Sample}.sorted.bam" "${Sample}/${Sample}.sort.bam"
+
+python /home/asd2007/ATACseq/run_ataqc.athena.py --workdir $PWD/${Sample} \
+    --outdir qc \
     --outprefix ${Sample} \
     --genome hg19 \
-    --ref /home/asd2007/melnick_bcell_scratch/asd2007/Reference/hg19/encodeHg19Male/encodeHg19Male.fa \
-    --tss /home/asd2007/melnick_bcell_scratch/asd2007/Reference/hg19/hg19_RefSeq_stranded.bed.gz \
-    --dnase /home/asd2007/melnick_bcell_scratch/asd2007/Reference/hg19/reg2map_honeybadger2_dnase_all_p10_ucsc.bed.gz \
-    --blacklist /home/asd2007/melnick_bcell_scratch/asd2007/Reference/hg19/wgEncodeDacMapabilityConsensusExcludable.bed.gz \
-    --prom /home/asd2007/melnick_bcell_scratch/asd2007/Reference/hg19/reg2map_honeybadger2_dnase_prom_p2.bed.gz \
-    --enh /home/asd2007/melnick_bcell_scratch/asd2007/Reference/hg19/reg2map_honeybadger2_dnase_enh_p2.bed.gz \
-    --reg2map /home/asd2007/melnick_bcell_scratch/asd2007/Reference/hg19/dnase_avgs_reg2map_p10_merged_named.pvals.gz \
-    --meta /home/asd2007/melnick_bcell_scratch/asd2007/Reference/hg19/eid_to_mnemonic.txt \
-    --fastq1 ${Sample}.R1.trim.fastq.gz \
-    --fastq2 ${Sample}.R2.trim.fastq.gz \
-    --alignedbam ${Sample}/${Sample}.bam \
-    --alignmentlog ${Sample}/${Sample}.align.log \
-    --coordsortbam ${Sample}/${Sample}.bam \
-    --duplog ${Sample}/${Sample}.sorted.dup.qc \
-    --pbc ${Sample}/${Sample}.sorted.pbc.qc \
-    --finalbam ${FINAL_BAM} \
-    --finalbed ${FINAL_BED} \
-    --bigwig $Sample/$Sample.readsInPeaks.bin5.centered.smooth.150.max200.bw \
-    --peaks ${Sample}/${Sample}.tn5.pf.narrowPeak.gz \
-    --naive_overlap_peaks ${Sample}/${Sample}.tn5_pooled.pf.pval0.1.500K.naive_overlap.narrowPeak.gz
+    --ref "${REFDIR}/hg19/encodeHg19Male/encodeHg19Male.fa" \
+    --tss "${REFDIR}/hg19/hg19_RefSeq_stranded.bed.gz" \
+    --dnase "${REFDIR}/hg19/reg2map_honeybadger2_dnase_all_p10_ucsc.bed.gz" \
+    --blacklist "${REFDIR}/hg19/wgEncodeDacMapabilityConsensusExcludable.bed.gz" \
+    --prom "${REFDIR}/hg19/reg2map_honeybadger2_dnase_prom_p2.bed.gz" \
+    --enh "${REFDIR}/hg19/reg2map_honeybadger2_dnase_enh_p2.bed.gz" \
+    --reg2map ${REG2MAP} \
+    --meta ${ROADMAP_META} \
+    --fastq1 ${F1} \
+    --fastq2 ${F2} \
+    --alignedbam ${ALIGNED_BAM} \
+    --alignmentlog "${Sample}/${Sample}.align.log" \
+    --coordsortbam "${Sample}/${Sample}.sorted.bam" \
+    --duplog "${Sample}/${Sample}.dup.qc" \
+    --pbc "${Sample}/${Sample}.pbc.qc" \
+    --finalbam "${FINAL_BAM}" \
+    --finalbed "${FINAL_BED}" \
+    --bigwig "$Sample/$Sample.smooth150.center.extend.fpkm.max150.bw" \
+    --peaks "${Sample}/${Sample}.nodup.tn5.pval0.01.500k.narrowPeak.gz" \
+    --naive_overlap_peaks "${Sample}/pseudo_reps/${Sample}.nodup.tn5.pooled.pf.pval0.1.500K.naive_overlap.narrowPeak.gz" \
+    --idr_peaks "${Sample}/IDR/${Sample}.IDR.txt.IDR0.1.filt.narrowPeak.gz"
 
 
 
@@ -433,90 +543,38 @@ python $HOME/dat02/asd2007/TOOLS/ataqc/run_ataqc.py --workdir ${Sample} \
 
 
 
+##python /home/asd2007/ATACseq/run_ataqc.py --workdir $PWD/${Sample} \
+##    --outdir qc \
+##    --outprefix ${Sample} \
+##    --genome hg19 \
+##    --ref /athena/elementolab/scratch/asd2007/Reference/hg19/encodeHg19Male/encodeHg19Male.fa \
+##    --tss /athena/elementolab/scratch/asd2007/Reference/hg19/hg19_RefSeq_stranded.bed.gz \
+##    --dnase /athena/elementolab/scratch/asd2007/Reference/hg19/reg2map_honeybadger2_dnase_all_p10_ucsc.bed.gz \
+##    --blacklist /athena/elementolab/scratch/asd2007/Reference/hg19/wgEncodeDacMapabilityConsensusExcludable.bed.gz \
+##    --prom /athena/elementolab/scratch/asd2007/Reference/hg19/reg2map_honeybadger2_dnase_prom_p2.bed.gz \
+##    --enh /athena/elementolab/scratch/asd2007/Reference/hg19/reg2map_honeybadger2_dnase_enh_p2.bed.gz \
+##    --reg2map /athena/elementolab/scratch/asd2007/Reference/hg19/dnase_avgs_reg2map_p10_merged_named.pvals.gz \
+##    --meta /athena/elementolab/scratch/asd2007/Reference/hg19/eid_to_mnemonic.txt \
+##    --fastq1 ${F1} \
+##    --fastq2 ${F2} \
+##    --alignedbam ${ALIGNED_BAM} \
+##    --alignmentlog "${Sample}/${Sample}.align.log" \
+##    --coordsortbam "${Sample}/${Sample}.sorted.bam" \
+##    --duplog "${Sample}/${Sample}.dup.qc" \
+##    --pbc "${Sample}/${Sample}.pbc.qc" \
+##    --finalbam "${FINAL_BAM}" \
+##    --finalbed "${FINAL_BED}" \
+##    --bigwig "$Sample/$Sample.readsInPeaks.bin5.centered.smooth.150.max200.bw" \
+##    --peaks "${Sample}/${Sample}.tn5.pf.narrowPeak.gz" \
+##    --naive_overlap_peaks "${Sample}/pseudo_reps/${Sample}.nodup.tn5.pooled.pf.pval0.1.500K.naive_overlap.narrowPeak.gz" \
+##    --idr_peaks "${Sample}/IDR/${Sample}.IDR.txt.IDR0.1.filt.narrowPeak.gz"
 
+rsync -r -a -v $TMPDIR/${Sample} $path/${Sample}
 
+rsync -r -a -v $TMPDIR/qc $path/${Sample}
 
-
-
-
-
-#
-#
-#
-#
-#
-#
-#
-#
-#
-#
-#
-#
-#
-#
-#FINAL_BAM="${TMPDIR}/${Sample}/${Sample}.sorted.nodup.noM.black.bam"
-#FINAL_BED="$TMPDIR/${Sample}/${Sample}.nsorted.fixmate.nodup.noM.black.Tn5.tagAlign.gz"
-#
-#WORKDIR="${TMPDIR}/${Sample}"
-#OUTDIR="${WORKDIR}/QCmetrics/atacqc"
-#OUTPREFIX="${Sample}"
-#INPREFIX="$Sample"
-#GENOME='hg19' # This is the only genome that currently works
-#
-#SAMPLE="$Sample"
-## Annotation files
-#ANNOTDIR="/home/asd2007/melnick_bcell_scratch/asd2007/Reference"
-#X="/home/asd2007/melnick_bcell_scratch/asd2007/Reference/hg19/"
-#DNASE_BED="${ANNOTDIR}/${GENOME}/reg2map_honeybadger2_dnase_all_p10_ucsc.bed.gz"
-#BLACKLIST_BED="/home/asd2007/melnick_bcell_scratch/asd2007/Reference/hg19/wgEncodeDacMapabilityConsensusExcludable.bed.gz"
-#TSS_BED="${ANNOTDIR}/${GENOME}/hg19_RefSeq_stranded.bed.gz"
-#REF_FASTA="${ANNOTDIR}/${GENOME}/encodeHg19Male.fa"
-#PROM="${ANNOTDIR}/${GENOME}/reg2map_honeybadger2_dnase_prom_p2.bed.gz"
-#ENH="${ANNOTDIR}/${GENOME}/reg2map_honeybadger2_dnase_enh_p2.bed.gz"
-#REG2MAP="${ANNOTDIR}/${GENOME}/dnase_avgs_reg2map_p10_merged_named.pvals.gz"
-#ROADMAP_META="${ANNOTDIR}/${GENOME}/eid_to_mnemonic.txt"
-#PBC="${WORKDIR}/$SAMPLE.pbc.qc"
-#F1="$TMPDIR/${Sample}.R1.trim.fastq.gz"
-#F2="$TMPDIR/${Sample}.R2.trim.fastq.gz"
-#
-#
-#
-#
-#
-#
-#
-#
-#
-#python $HOME/dat02/asd2007/TOOLS/ataqc/run_ataqc.py --workdir ${TMPDIR}/${Sample} \
-#    --outdir ${TMPDIR}/${Sample} \
-#    --outprefix ${Sample} \
-#    --genome hg19 \
-#    --ref /home/asd2007/melnick_bcell_scratch/asd2007/Reference/hg19/encodeHg19Male/encodeHg19Male.fa \
-#    --tss /home/asd2007/melnick_bcell_scratch/asd2007/Reference/hg19/hg19_RefSeq_stranded.bed.gz \
-#    --dnase /home/asd2007/melnick_bcell_scratch/asd2007/Reference/hg19/reg2map_honeybadger2_dnase_all_p10_ucsc.bed.gz \
-#    --blacklist /home/asd2007/melnick_bcell_scratch/asd2007/Reference/hg19/wgEncodeDacMapabilityConsensusExcludable.bed.gz \
-#    --prom /home/asd2007/melnick_bcell_scratch/asd2007/Reference/hg19/reg2map_honeybadger2_dnase_prom_p2.bed.gz \
-#    --enh /home/asd2007/melnick_bcell_scratch/asd2007/Reference/hg19/reg2map_honeybadger2_dnase_enh_p2.bed.gz \
-#    --reg2map /home/asd2007/melnick_bcell_scratch/asd2007/Reference/hg19/dnase_avgs_reg2map_p10_merged_named.pvals.gz \
-#    --meta /home/asd2007/melnick_bcell_scratch/asd2007/Reference/hg19/eid_to_mnemonic.txt \
-#    --fastq1 $TMPDIR/${Sample}.R1.trim.fastq.gz \
-#    --fastq2 $TMPDIR/${Sample}.R2.trim.fastq.gz \
-#    --alignedbam ${TMPDIR}/${Sample}/${Sample}.bam \
-#    --aligmmentlog ${TMPDIR}/${Sample}/${Sample}.align.log \
-#    --coordsortbam ${TMPDIR}/${Sample}/${Sample}.bam \
-#    --duplog ${TMPDIR}/${Sample}/${Sample}.sorted.dup.qc \
-#    --pbc ${TMPDIR}/${Sample}/${Sample}.sorted.pbc.qc \
-#    --finalbam ${FINAL_BAM} \
-#    --finalbed ${FINAL_BED} \
-#    --bigwig ${TMPDIR}/$Sample/$Sample.readsInPeaks.bin5.centered.smooth.150.max200.bw \
-#    --peaks $TMPDIR/${Sample}/${Sample}.tn5.pf.narrowPeak.gz \
-#    --naive_overlap_peaks $TMPDIR/${Sample}/${Sample}.tn5_pooled.pf.pval0.1.500K.naive_overlap.narrowPeak.gz 
-    #--idr_peaks \
-
-
-
-                   # --naive_overlap_peaks /zenodotus/dat02/elemento_lab_scratch/oelab_scratch_scratch007/asd2007/Projects/DataSets/atacData/atacEC3986/BDS/GCB/Sample_GCB_138/out/peak/macs2/overlap/Sample_GCB_138.R1.trim.PE2SE.nodup.tn5_pooled.pf.pval0.1.500K.naive_overlap.narrowPeak.gz \
-		                 # --idr_peaks /zenodotus/dat02/elemento_lab_scratch/oelab_scratch_scratch007/asd2007/Projects/DataSets/atacData/atacEC3986/BDS/GCB/Sample_GCB_138/out/peak/idr/optimal_set/ppr.IDR0.1.filt.narrowPeak.gz \
+################
+###############
 
 
 
@@ -529,13 +587,13 @@ then
  ## save to run on pooled samples
  ## high resolution 1bp bin insertion density
    
-    #pyatac ins --bam $TMPDIR/${Sample}/${Sample}.sorted.nodup.noM.black.bam --out $TMPDIR/${Sample}/${Sample}.ins.smooth --smooth 151 --cores ${NSLOTS}
+    #pyatac ins --bam $TMPDIR/${Sample}/${Sample}.sorted.nodup.noM.bam --out $TMPDIR/${Sample}/${Sample}.ins.smooth --smooth 151 --cores ${NSLOTS}
 
 #
     #REF="/zenodotus/dat02/elemento_lab_scratch/oelab_scratch_scratch007/akv3001/Genomes/Homo_sapiens/UCSC/mm10/Sequence/BWAIndex/genome.fa"
-    #rsync -avP /home/asd2007/dat02/asd2007/Reference/Homo_sapiens/UCSC/hg19/Sequence/WholeGenomeFasta/genome.* ./
+    #rsync -avP /athena/elementolab/scratch/asd2007/Reference/Homo_sapiens/UCSC/hg19/Sequence/WholeGenomeFasta/genome.* ./
     rsync -avP $REFGen/${RG}.* ./
-    nucleoatac run --bed $TMPDIR/${Sample}/${Sample}.slop1k.bed --bam $TMPDIR/${Sample}/${Sample}.sorted.nodup.noM.black.bam --fasta $TMPDIR/${RG}.fa --out  $TMPDIR/${Sample}/${Sample} \
+    nucleoatac run --bed $TMPDIR/${Sample}/${Sample}.slop1k.bed --bam $TMPDIR/${Sample}/${Sample}.sorted.nodup.noM.bam --fasta $TMPDIR/${RG}.fa --out  $TMPDIR/${Sample}/${Sample} \
         --write_all --cores ${NSLOTS}
     #
     rsync -avP $TMPDIR/${Sample} $path/${Sample}
@@ -555,8 +613,6 @@ then
 else
     echo "---- no NucleoATAC------------------------------"
 
-    rsync -avP $TMPDIR/${Sample} $path/${Sample}
-    rsync -r -a -v $TMPDIR/${Sample} $path/${Sample}
 fi
 
 
@@ -566,20 +622,20 @@ fi
 
 
 
-fetchChromSizes hg19 > hg19.chrom.sizes
+#fetchChromSizes hg19 > hg19.chrom.sizes
 
-prefix=$TMPDIR/${Sample}/${Sample}.tag.narrow
+#prefix=$TMPDIR/${Sample}/${Sample}.tag.narrow
 #macs2 bdgcmp -t ${prefix}_treat_pileup.bdg -c ${prefix}_control_lambda.bdg -o ${prefix}_FE.bdg -m FE
 
-macs2 bdgcmp -t ${prefix}_treat_pileup.bdg -c ${prefix}_control_lambda.bdg \
-    --o-prefix ${prefix} -m FE
+#macs2 bdgcmp -t ${prefix}_treat_pileup.bdg -c ${prefix}_control_lambda.bdg \
+#    --o-prefix ${prefix} -m FE
 
-slopBed -i ${prefix}_FE.bdg -g $chrsz -b 0 | bedClip stdin hg19.chrom.sizes ${prefix}_fc.bedgraph
-rm -f ${prefix}_FE.bdg
+#slopBed -i ${prefix}_FE.bdg -g $chrsz -b 0 | bedClip stdin hg19.chrom.sizes ${prefix}_fc.bedgraph
+#rm -f ${prefix}_FE.bdg
 
-sort -k1,1 -k2,2n ${prefix}_fc.bedgraph > ${prefix}_fc.srt.bedgraph
+#sort -k1,1 -k2,2n ${prefix}_fc.bedgraph > ${prefix}_fc.srt.bedgraph
 
-bedGraphToBigWig  ${prefix}_fc.srt.bedgraph $chrsz ${prefix}_fc.bw
+#bedGraphToBigWig  ${prefix}_fc.srt.bedgraph $chrsz ${prefix}_fc.bw
 
 
 
@@ -595,16 +651,15 @@ bedGraphToBigWig  ${prefix}_fc.srt.bedgraph $chrsz ${prefix}_fc.bw
 
 
 
-#rm ${p1}_FE.bdg ${p1}_treat_pileup.bdg ${p1}_control_lambda.bdg
 
 # Create bigwig file
-sort -k8nr,8nr ${prefix}_peaks.narrowPeak | gzip -c > ${prefix}.peaks.bed.gz
-#rm ${p1}_peaks.encodePeak
-zcat ${prefix}.peaks.bed.gz | awk 'BEGIN{OFS="\t"}{print $1,$2,$3,$8}' > ${prefix}.4col.peaks.bed
+#sort -k8nr,8nr ${prefix}_peaks.narrowPeak | gzip -c > ${prefix}.peaks.bed.gz
+#rm ${p1}_peaks.encodePeak#
+#zcat ${prefix}.peaks.bed.gz | awk 'BEGIN{OFS="\t"}{print $1,$2,$3,$8}' > ${prefix}.4col.peaks.bed
 
 
-rsync -avP $TMPDIR/${Sample}* $path/${Sample}/
-rsync -r -a -v $TMPDIR/${Sample} $path/${Sample}/
+#rsync -avP $TMPDIR/${Sample}* $path/${Sample}/
+#rsync -r -a -v $TMPDIR/${Sample} $path/${Sample}/
 
 
 

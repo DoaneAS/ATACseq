@@ -6,18 +6,19 @@
 #$ -l zenodotus=true
 #$ -l os=rhel6.3
 #$ -M ashley.doane@gmail.com
-#$ -l h_rt=33:00:00
-#$ -pe smp 4
-#$ -l h_vmem=11G
+#$ -l h_rt=32:00:00
+#$ -pe smp 4-8
+#$ -l h_vmem=12G
 #$ -R y
 #$ -o /home/asd2007/joblogs
 
 BT2=1
+BWA=0
 INPUT_FASTQ=1
 path=$1 #path to all the Sample folders
-
+RSA=0
+RSAINPUT=0
 #file=`awk 'NR==n' n=$SGE_TASK_ID INPUTS`
-
 gtf_path=$2 #Number indicating the reference gtf [1 for Human 2 for Mouse 3 for other]
 #CONT="/home/asd2007/melnick_bcell_scratch/asd2007/Projects/barbieri/PCa/Zhao/sample_SRR2033042_LNCaP_input/sample_SRR2033042_LNCaP_input/sample_SRR2033042_LNCaP_input.sorted.nodup.bam"
 #CONT=$3
@@ -31,7 +32,7 @@ gtf_path=$2 #Number indicating the reference gtf [1 for Human 2 for Mouse 3 for 
 file=$(ls ${path} | tail -n +${SGE_TASK_ID}| head -1)
 
 #change directory to node directory
-cd $TMPDIR
+cd ${TMPDIR}
 
 echo "File : $file Read from $path\n"
 
@@ -46,10 +47,10 @@ Sample=${Sample%%.*}
 
 #rsync -r -v -a -z $path/$file/*.fastq ./
 
-rsync -r -v -a -z $path/$file/*.sra ./
-rsync -r -v -a -z $path/$file/*.gz ./
+rsync  -a $path/$file/*.sra ./
+rsync  -a  $path/$file/*.gz ./
 
-rsync -r -v -a -z $path/$file/ ./
+rsync -r -a   $path/$file/ ./
 
 
 ##for SRA
@@ -57,10 +58,14 @@ rsync -r -v -a -z $path/$file/ ./
 echo "making fastq fromm SRA using fastq-dump.."
 
 #fastq-dump *.sra
-#mkdir -p INPUT
-#mv *INPUT.* INPUT/
-fastq-dump --gzip --skip-technical  --readids --dumpbase --split-files --clip *INPUT*.sra
+mkdir -p INPUT
+mv *INPUT.* INPUT/
 
+
+if [ $RSAINPUT == 1 ]
+then
+    fastq-dump --gzip --skip-technical  --readids --dumpbase --split-files --clip *INPUT*.sra
+fi
 #rm *INPUT*.sra
 
 myd=$(ls -lrth $TMPDIR)
@@ -75,12 +80,15 @@ echo "Processing  $Sample ..."
 if [ $gtf_path == 1 ]
 then
 	#gtf="/zenodotus/dat02/elemento_lab_scratch/oelab_scratch_scratch007/akv3001/mm10_UCSC_ref.gtf"
-	REF="/zenodotus/dat02/elemento_lab_scratch/oelab_scratch_scratch007/akv3001/Genomes/Homo_sapiens/UCSC/hg19/Sequence/BWAIndex"
-	REFbt2="/zenodotus/dat02/elemento_lab_scratch/oelab_scratch_scratch007/akv3001/Genomes/Homo_sapiens/UCSC/hg19/Sequence/Bowtie2Index"
+	#REF="/zenodotus/dat02/elemento_lab_scratch/oelab_scratch_scratch007/akv3001/Genomes/Homo_sapiens/UCSC/hg19/Sequence/BWAIndex"
+	REF="/zenodotus/dat02/elemento_lab_scratch/oelab_scratch_scratch007/akv3001/Genomes/Homo_sapiens/UCSC/hg19/Sequence/BWAIndex/genome"
+  REFbt2="/zenodotus/dat02/elemento_lab_scratch/oelab_scratch_scratch007/akv3001/Genomes/Homo_sapiens/UCSC/hg19/Sequence/Bowtie2Index"
    # REFbt="/home/asd20i07/dat02/asd2007/Reference/Homo_sapiens/UCSC/mm10/Sequence/BowtieIndex/genome"
   #  BLACK="/home/asd2007/dat02/asd2007/Reference/encodeBlack.bed"
-    BLACK="/home/asd2007/melnick_bcell_scratch/asd2007/Reference/hg19/Anshul_Hg19UltraHighSignalArtifactRegions.bed"
-    chrsz="/home/asd2007/melnick_bcell_scratch/asd2007/Reference/hg19.genome.chrom.sizes"
+  BLACK="/home/asd2007/melnick_bcell_scratch/asd2007/Reference/hg19/Anshul_Hg19UltraHighSignalArtifactRegions.bed"
+  fetchChromSizes hg19 > hg19.chrom.sizes
+    chrsz="hg19.chrom.sizes"
+    "/home/asd2007/melnick_bcell_scratch/asd2007/Reference/hg19.genome.chrom.sizes"
     RG="hg19"
 elif [ $gtf_path == 2 ]
 then
@@ -96,11 +104,9 @@ else
 	REF="/zenodotus/dat02/elemento_lab_scratch/oelab_scratch_scratch007/akv3001/Genomes/Homo_sapiens/UCSC/mm10/Sequence/BWAIndex/genome.fa"
 fi
 
-mkdir ref
+#rsync -a ${REF} ${TMPDIR}/
 
-rsync -avP ${REF} $TMPDIR/
-
-rsync -avP ${REFbt2} $TMPDIR/
+rsync -a ${REFbt2} ${TMPDIR}/
 
 mkdir ${TMPDIR}/${Sample}
 
@@ -116,7 +122,6 @@ ls -lrth $TMPDIR
 #REF="$TMPDIR/ref/genome.fa"
 
 mkdir R1
-mkdir ${Sample}
 
 
 
@@ -130,27 +135,35 @@ echo "----------bt2 aligning-------------"
 #Use bwa mem to align each pair in data set
 
 
+ReadGroup="$( echo '@RG'"\tID:${Sample}\tLB:${Sample}\tPL:illumina\tSM:${Sample}\tPU:${Sample}")"
 if [ $INPUT_FASTQ == 1 ]
 then
     mkdir -p $TMPDIR/INPUT
-    cat $TMPDIR/*INPUT*.fastq.gz > $TMPDIR/INPUT/${Sample}.INPUT.fastq.gz
-    rm $TMPDIR/*INPUT*.fastq.gz
-    bowtie2  --very-sensitive-local -p ${NSLOTS} -x $TMPDIR/Bowtie2Index/genome -U $TMPDIR/INPUT/${Sample}.INPUT.fastq.gz -S $TMPDIR/${Sample}.INPUT.sam
+    cat ${TMPDIR}/*INPUT*.fastq.gz > ${TMPDIR}/INPUT/${Sample}.INPUT.fastq.gz
+    rm ${TMPDIR}/*INPUT*.fastq.gz
+    bwa mem -t ${NSLOTS} ${REF}*.fa $TMPDIR/INPUT/${Sample}.INPUT.fastq.gz >  $TMPDIR/${Sample}.INPUT.sam 
+   # bowtie2  --very-sensitive-local -p ${NSLOTS} -x $TMPDIR/Bowtie2Index/genome -U $TMPDIR/INPUT/${Sample}.INPUT.fastq.gz -S $TMPDIR/${Sample}.INPUT.sam
     samtools view -bS $TMPDIR/${Sample}.INPUT.sam | samtools sort  - -o $TMPDIR/${Sample}/${Sample}.INPUT.sorted.bam
     rm *.sam
     samtools index $TMPDIR/${Sample}/${Sample}.INPUT.sorted.bam
     mkdir -p ${TMPDIR}/tmp
     CONT=$TMPDIR/${Sample}/${Sample}.INPUT.sorted.bam
     java -Xmx8g -jar /home/ole2001/PROGRAMS/SOFT/picard-tools-1.71/MarkDuplicates.jar REMOVE_DUPLICATES=true INPUT=$CONT METRICS_FILE=$TMPDIR/${Sample}/Input.dedup.txt OUTPUT=$TMPDIR/${Sample}/${Sample}.INPUT.sorted.nodup.bam VALIDATION_STRINGENCY=LENIENT ASSUME_SORTED=True
-    CONT="$TMPDIR/${Sample}/${Sample}.INPUT.sorted.nodup.bam"
+    CONT="${TMPDIR}/${Sample}/${Sample}.INPUT.sorted.nodup.bam"
     samtools index $CONT
 fi
 
 
-CONT="$TMPDIR/${Sample}/${Sample}.INPUT.sorted.nodup.bam"
+#CONT="${TMPDIR}/${Sample}/${Sample}.INPUT.sorted.nodup.bam"
+
+###########
+echo "----- FINISHED PROCESSING INPUT------"
 
 
-fastq-dump --gzip --skip-technical  --readids --dumpbase --split-files --clip *.sra
+if [ $RSA == 1 ]
+then
+    fastq-dump --gzip --skip-technical  --readids --dumpbase --split-files --clip *.sra
+fi
 
 cat $TMPDIR/*.fastq.gz > $TMPDIR/R1/${Sample}.fastq.gz
 
@@ -165,6 +178,15 @@ if [ $BT2 == 1 ]
 then
     bowtie2 --very-sensitive-local --threads ${NSLOTS} -x $TMPDIR/Bowtie2Index/genome \
         -U $TMPDIR/R1/${Sample}.fastq.gz  2> ${Sample}/${Sample}.align.log| \
+        samtools view -bS - > $TMPDIR/${Sample}/${Sample}.bam
+    sambamba sort --memory-limit 35GB \
+             --nthreads ${NSLOTS} --tmpdir ${TMPDIR} --out $TMPDIR/${Sample}/${Sample}.sorted.bam $TMPDIR/${Sample}/${Sample}.bam
+    samtools index $TMPDIR/${Sample}/${Sample}.sorted.bam
+fi
+
+if [ $BWA == 1 ]
+then
+        bwa mem -t ${NSLOTS} ${REF}*.fa $TMPDIR/R1/${Sample}.fastq.gz | \
         samtools view -bS - > $TMPDIR/${Sample}/${Sample}.bam
     sambamba sort --memory-limit 35GB \
              --nthreads ${NSLOTS} --tmpdir ${TMPDIR} --out $TMPDIR/${Sample}/${Sample}.sorted.bam $TMPDIR/${Sample}/${Sample}.bam
@@ -208,9 +230,8 @@ samtools index $TMPDIR/${Sample}/${Sample}.sorted.nodup.black.bam
 #/home/ole2001/PROGRAMS/SOFT/bedtools2/bin/bamToBed -i $TMPDIR/${Sample}/${Sample}.sorted.nodup.black.bam  > $TMPDIR/${Sample}/${Sample}.sorted.nodup.black.bed
 
 
-rsync -r -v $TMPDIR/${Sample} $path/${Sample}
+rsync -a -r $TMPDIR/${Sample} $path/${Sample}
 
-rsync -r -v $TMPDIR/${Sample}* $path/${Sample}
 
 echo "------------------------------------------Call Peaks with MACS2--------------------------------------------"
 
@@ -225,6 +246,7 @@ echo "------------------------------------------Call Peaks with MACS2-----------
 
 #rsync -avP ${CONT} $TMPDIR/
 
+#CONT="/zenodotus/dat02/elemento_lab_scratch/oelab_scratch_scratch007/asd2007/Projects/DataSets/ChIPSeq/LY7_wendy/LY7_669/Sample_Ly7_Input_669/Ly7_INPUT_669.INPUT.sorted.nodup.bam"
 samtools view -b ${CONT} | bamToBed -i stdin | awk 'BEGIN{FS="\t";OFS="\t"}{$4="N"; print $0}' | gzip -c > $TMPDIR/Input.tagAlign.gz
 
 samtools view -b $TMPDIR/${Sample}/${Sample}.sorted.nodup.bam | bamToBed -i stdin | awk 'BEGIN{FS="\t";OFS="\t"}{$4="N"; print $0}' | gzip -c > $TMPDIR/${Sample}/${Sample}.tagAlign.gz
@@ -243,8 +265,7 @@ macs2 callpeak -t $TMPDIR/${Sample}/${Sample}.tagAlign.gz -c $TMPDIR/Input.tagAl
 
 
 
-rsync -avP $TMPDIR/${Sample}* $path/${Sample}/
-rsync -r -a -v $TMPDIR/${Sample} $path/${Sample}/
+rsync -r -a  $TMPDIR/${Sample} $path/${Sample}/
 
 
 
@@ -267,6 +288,11 @@ bedGraphToBigWig  ${prefix}_fc.srt.bedgraph hg19.chrom.sizes ${prefix}_fc.bw
 
 rm ${Sample}/*.bedgraph
 
+
+rm ${prefix}*.bedgraph
+
+rsync -a ${prefix}_fc.bw /home/asd2007/melnick_bcell_scratch/asd2007/DATASETS/chipSeqSCORE/
+
 #slopBed -i ${prefix}_FE.bdg -g $chrsz -b 0 | bedClip stdin $chrsz ${prefix}.FE.bedGraph
 
 #bedGraphToBigWig ${p1}.FE.bedGraph ${chrsz} ${prefix}.FE.bigWig
@@ -283,8 +309,7 @@ sort -k8nr,8nr ${prefix}_peaks.narrowPeak | gzip -c > ${prefix}.peaks.bed.gz
 zcat ${prefix}.peaks.bed.gz | awk 'BEGIN{OFS="\t"}{print $1,$2,$3,$8}' > ${prefix}.4col.peaks.bed
 
 
-rsync -avP $TMPDIR/${Sample}* $path/${Sample}/
-rsync -r -a -v $TMPDIR/${Sample} $path/${Sample}/
+rsync -r -a $TMPDIR/${Sample} $path/${Sample}/
 
 
 
@@ -311,8 +336,7 @@ bamCoverage --bam $TMPDIR/${Sample}/${Sample}.sorted.nodup.bam --binSize 5 \
 
 
 
-rsync -avP $TMPDIR/${Sample} $path/${Sample}/
-rsync -r -a -v $TMPDIR/${Sample} $path/${Sample}/
+rsync -a -r $TMPDIR/${Sample} $path/${Sample}/
 #
 #
 #

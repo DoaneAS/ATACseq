@@ -132,7 +132,7 @@ ROADMAP_META="${ANNOTDIR}/${GENOME}/eid_to_mnemonic.txt"
 
 #python /home/asd2007/ATACseq/run_ataqc.athena.py --workdir $PWD/${Sample} \
 
-python /home/asd2007/ATACseq/run_ataqc.athena.py --workdir $PWD/${Sample} \
+python /home/asd2007/ATACseq/run_ataqc.peakMets.py --workdir $PWD/${Sample} \
     --outdir qc \
     --outprefix ${Sample} \
     --genome hg19 \

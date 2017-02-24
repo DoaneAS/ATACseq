@@ -7,15 +7,15 @@
 #$ -l athena=true
 #$ -M ashley.doane@gmail.com
 ###$ -l h_rt=42:00:00
-#$ -pe smp 4
-#$ -l h_vmem=12G
+#$ -pe smp 8-12
+#$ -l h_vmem=10G
 #$ -R y
 #$ -o /home/asd2007/joblogs
 
 ########### SETTINGS ###########
-TRIM=0 # 
+TRIM=1 # 
 NUC=0 # run nucleoatac, extended runtime required
-BT2ALN=0 # bt2 recommnded!
+BT2ALN=1 # bt2 recommnded!
 ATHENA=1
 ##############################
 
@@ -42,10 +42,10 @@ Sample=${Sample%%.*}
 
 #rsync -r -v -a -z $path/$file/*.fastq ./
 
-rsync -r -v -a -z $path/$file/*.gz ./
+rsync -r -v -a  $path/$file/*.gz ./
 
 
-rsync -r -v -a -z $path/$file/* ./
+rsync -r -v -a  $path/$file/* ./
 
 rsync -r -v -a -z $path/$file/*.sra ./
 #rsync -r -v -a -z $path/$file/ ./
@@ -54,8 +54,14 @@ rsync -r -v -a -z $path/$file/*.sra ./
 
 #SRA=$(ls *.sra)
 
+mkdir -p ${Sample}
 
-parallel -j ${NSLOTS} 'fastq-dump --split-files {}' ::: *.sra
+#pigz -p $NSLOTS -c *.R1.trim.fastq > $TMPDIR/${Sample}.R1.trim.fastq.gz
+#pigz -p $NSLOTS -c *.R2.trim.fastq > $TMPDIR/${Sample}.R2.trim.fastq.gz
+
+#rm *trim.fastq
+
+#parallel -j ${NSLOTS} 'fastq-dump --split-files {}' ::: *.sra
 #fastq-dump --split-files ${SRA}
 
 #fastq-dump --split-files *.sra
@@ -144,8 +150,10 @@ then
 else
     echo "will not perform adapter sequence trimming of reads"
     #gunzip *.gz
-      #mv ${Sample}.R1.fastq $TMPDIR/${Sample}.R1.trim.fastq
-      #mv ${Sample}.R2.fastq $TMPDIR/${Sample}.R2.trim.fastq
+      mv *.R1*fastq.gz $TMPDIR/${Sample}.R1.trim.fastq.gz
+      mv *.R2*fastq.gz $TMPDIR/${Sample}.R2.trim.fastq.gz
+      echo "fastq files to align"
+      ls $TMPDIR/${Sample}.R*.trim.fastq.gz
 fi
 
 
@@ -319,25 +327,26 @@ rsync -r -a -v $TMPDIR/${Sample} $path/${Sample}
 
 
 # Peak atlas using Chang data and B cells
-#BED="/athena/elementolab/scratch/asd2007/Projects/DataSets/atacData/ATAC-AML/AML/cellAtlas.bed"
+BED="/athena/elementolab/scratch/asd2007/Projects/DataSets/atacData/ATAC-AML/AML/cellAtlas.bed"
+
 #BED="/athena/elementolab/scratch/asd2007/Projects/DataSets/atacData/atacCN1/project/cellAtlas.CN1.bed"
 
 
-#pyatac counts --bam  $TMPDIR/${Sample}/${Sample}.sorted.nodup.noM.bam --bed ${BED} --out $TMPDIR/${Sample}/${Sample}.150.ins --upper 150
+pyatac counts --bam  $TMPDIR/${Sample}/${Sample}.sorted.nodup.noM.bam --bed ${BED} --out $TMPDIR/${Sample}/${Sample}.150.ins --upper 150
 ##bedtools multicov -split -bams $BAMS -bed $BED
 
-#pyatac counts --bam  $TMPDIR/${Sample}/${Sample}.sorted.nodup.noM.bam --bed ${BED} --out $TMPDIR/${Sample}/${Sample}.ins
-#LIBS=$(zcat ${Sample}/${Sample}.ins.counts.txt.gz  | awk '{sum +=$1} END  {printf sum}')
+pyatac counts --bam  $TMPDIR/${Sample}/${Sample}.sorted.nodup.noM.bam --bed ${BED} --out $TMPDIR/${Sample}/${Sample}.ins
+LIBS=$(zcat ${Sample}/${Sample}.ins.counts.txt.gz  | awk '{sum +=$1} END  {printf sum}')
 
-#let KM=2000000 #1 million * bin size in kb
-#let LIBZ=$LIBS/$KM
+let KM=2000000 #1 million * bin size in kb
+let LIBZ=$LIBS/$KM
 
-#bamCoverage --bam  $TMPDIR/${Sample}/${Sample}.sorted.nodup.noM.bam --binSize 20 \
-#    --outFileFormat bigwig --smoothLength 150  \
-#    --scaleFactor $LIBZ \
-#    -o ${TMPDIR}/${Sample}/$Sample.readsInPeaks.bin20.centered.smooth.150.max150f.bw --numberOfProcessors ${NSLOTS} \
-#    --maxFragmentLength 150 \
-#    --centerReads --extendReads
+bamCoverage --bam  $TMPDIR/${Sample}/${Sample}.sorted.nodup.noM.bam --binSize 20 \
+    --outFileFormat bigwig --smoothLength 150  \
+    --scaleFactor $LIBZ \
+    -o ${TMPDIR}/${Sample}/$Sample.readsInPeaks.bin20.centered.smooth.150.max150f.bw --numberOfProcessors ${NSLOTS} \
+    --maxFragmentLength 150 \
+    --centerReads --extendReads
 
 
 
@@ -475,6 +484,91 @@ PBC="${WORKDIR}/$SAMPLE.pbc.qc"
 
 
 
+##
+##
+##GENOME='hg19' # This is the only genome that currently works
+##SAMPLE="$Sample"
+##
+##PBC="${WORKDIR}/$SAMPLE.pbc.qc"
+##FINAL_BAM="${Sample}/${Sample}.sorted.nodup.noM.bam"
+##FINAL_BED="${Sample}/${Sample}.nodup.tn5.tagAlign.gz"
+##
+##F1="${Sample}.R1.trim.fastq.gz"
+##F2="${Sample}.R2.trim.fastq.gz"
+##ALIGNED_BAM="${Sample}/${Sample}.sorted.bam"
+##WORKDIR=$PWD
+##OUTDIR="qc"
+##OUTPREFIX=$Sample
+##INPREFIX=$Sample
+##GENOME='hg19' # This is the only genome that currently works
+##
+### Annotation files
+##X="/athena/elementolab/scratch/asd2007/Reference/hg19/"
+##DNASE_BED="${ANNOTDIR}/${GENOME}/reg2map_honeybadger2_dnase_all_p10_ucsc.bed.gz"
+##BLACKLIST_BED="${ANNOTDIR}/${GENOME}/wgEncodeDacMapabilityConsensusExcludable.bed.gz"
+##TSS_BED="${ANNOTDIR}/${GENOME}/hg19_RefSeq_stranded.bed.gz"
+##REF_FASTA="${ANNOTDIR}/${GENOME}/encodeHg19Male.fa"
+##PROM="${ANNOTDIR}/${GENOME}/reg2map_honeybadger2_dnase_prom_p2.bed.gz"
+##ENH="${ANNOTDIR}/${GENOME}/reg2map_honeybadger2_dnase_enh_p2.bed.gz"
+##REG2MAP="${ANNOTDIR}/${GENOME}/dnase_avgs_reg2map_p10_merged_named.pvals.gz"
+##ROADMAP_META="${ANNOTDIR}/${GENOME}/eid_to_mnemonic.txt"
+
+
+#cp "${Sample}/${Sample}.sorted.bam" "${Sample}/${Sample}.sort.bam"
+
+##python /home/asd2007/ATACseq/run_ataqc.athena.py --workdir $PWD/${Sample} \
+##    --outdir qc \
+##    --outprefix ${Sample} \
+##    --genome hg19 \
+##    --ref "${REFDIR}/hg19/encodeHg19Male/encodeHg19Male.fa" \
+##    --tss "${REFDIR}/hg19/hg19_RefSeq_stranded.bed.gz" \
+##    --dnase "${REFDIR}/hg19/reg2map_honeybadger2_dnase_all_p10_ucsc.bed.gz" \
+##    --blacklist "${REFDIR}/hg19/wgEncodeDacMapabilityConsensusExcludable.bed.gz" \
+##    --prom "${REFDIR}/hg19/reg2map_honeybadger2_dnase_prom_p2.bed.gz" \
+##    --enh "${REFDIR}/hg19/reg2map_honeybadger2_dnase_enh_p2.bed.gz" \
+##    --reg2map ${REG2MAP} \
+##    --meta ${ROADMAP_META} \
+##    --fastq1 ${F1} \
+##    --fastq2 ${F2} \
+##    --alignedbam ${ALIGNED_BAM} \
+##    --alignmentlog "${Sample}/${Sample}.align.log" \
+##    --coordsortbam "${Sample}/${Sample}.sorted.bam" \
+##    --duplog "${Sample}/${Sample}.dup.qc" \
+##    --pbc "${Sample}/${Sample}.pbc.qc" \
+##    --finalbam "${FINAL_BAM}" \
+##    --finalbed "${FINAL_BED}" \
+##    --bigwig "$Sample/$Sample.smooth150.center.extend.fpkm.max150.bw" \
+##    --peaks "${Sample}/${Sample}.nodup.tn5.pval0.01.500k.narrowPeak.gz" \
+##    --naive_overlap_peaks "${Sample}/pseudo_reps/${Sample}.nodup.tn5.pooled.pf.pval0.1.500K.naive_overlap.narrowPeak.gz" \
+##    --idr_peaks "${Sample}/IDR/${Sample}.IDR.txt.IDR0.1.filt.narrowPeak.gz"
+##
+##
+
+
+
+
+ALIGNED_BAM="${PWD}/${Sample}/${Sample}.bam"
+WORKDIR=$PWD
+OUTDIR="qc"
+OUTPREFIX=$Sample
+INPREFIX=$Sample
+GENOME='hg19' # This is the only genome that currently works
+
+SAMPLE="$Sample"
+# Annotation files
+
+#ANNOTDIR="/home/asd2007/melnick_bcell_scratch/asd2007/Reference"
+#ANNOTDIR="/athena/elementolab/scratch/asd2007/Reference"
+
+DNASE_BED="${ANNOTDIR}/${GENOME}/reg2map_honeybadger2_dnase_all_p10_ucsc.bed.gz"
+BLACKLIST_BED="${ANNOTDIR}/${GENOME}/wgEncodeDacMapabilityConsensusExcludable.bed.gz"
+TSS_BED="${ANNOTDIR}/${GENOME}/hg19_RefSeq_stranded.bed.gz"
+REF_FASTA="${ANNOTDIR}/${GENOME}/encodeHg19Male.fa"
+PROM="${ANNOTDIR}/${GENOME}/reg2map_honeybadger2_dnase_prom_p2.bed.gz"
+ENH="${ANNOTDIR}/${GENOME}/reg2map_honeybadger2_dnase_enh_p2.bed.gz"
+REG2MAP="${ANNOTDIR}/${GENOME}/dnase_avgs_reg2map_p10_merged_named.pvals.gz"
+ROADMAP_META="${ANNOTDIR}/${GENOME}/eid_to_mnemonic.txt"
+PBC="${WORKDIR}/$SAMPLE.pbc.qc"
 
 
 GENOME='hg19' # This is the only genome that currently works
@@ -507,6 +601,9 @@ ROADMAP_META="${ANNOTDIR}/${GENOME}/eid_to_mnemonic.txt"
 
 #cp "${Sample}/${Sample}.sorted.bam" "${Sample}/${Sample}.sort.bam"
 
+
+#python /home/asd2007/ATACseq/run_ataqc.athena.py --workdir $PWD/${Sample} \
+
 python /home/asd2007/ATACseq/run_ataqc.athena.py --workdir $PWD/${Sample} \
     --outdir qc \
     --outprefix ${Sample} \
@@ -532,12 +629,6 @@ python /home/asd2007/ATACseq/run_ataqc.athena.py --workdir $PWD/${Sample} \
     --peaks "${Sample}/${Sample}.nodup.tn5.pval0.01.500k.narrowPeak.gz" \
     --naive_overlap_peaks "${Sample}/pseudo_reps/${Sample}.nodup.tn5.pooled.pf.pval0.1.500K.naive_overlap.narrowPeak.gz" \
     --idr_peaks "${Sample}/IDR/${Sample}.IDR.txt.IDR0.1.filt.narrowPeak.gz"
-
-
-
-
-
-
 
 
 

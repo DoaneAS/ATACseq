@@ -3,17 +3,16 @@
 #$ -j y
 #$ -m a
 #$ -cwd
-#$ -l zenodotus=true
-#$ -l os=rhel6.3
+#$ -l "athena=true"
 #$ -M ashley.doane@gmail.com
-#$ -l h_rt=32:00:00
+#$ -l h_rt=22:00:00
 #$ -pe smp 4-8
-#$ -l h_vmem=12G
+#$ -l h_vmem=5G
 #$ -R y
 #$ -o /home/asd2007/joblogs
 
-BT2=1
-BWA=0
+BT2=0
+BWA=1
 INPUT_FASTQ=1
 path=$1 #path to all the Sample folders
 RSA=0
@@ -47,10 +46,10 @@ Sample=${Sample%%.*}
 
 #rsync -r -v -a -z $path/$file/*.fastq ./
 
-rsync  -a $path/$file/*.sra ./
-rsync  -a  $path/$file/*.gz ./
+#rsync  -a $path/$file/*.sra ./
+#rsync  -a  $path/$file/*.gz ./
 
-rsync -r -a   $path/$file/ ./
+rsync  -av   $path/$file/ ./
 
 
 ##for SRA
@@ -58,8 +57,6 @@ rsync -r -a   $path/$file/ ./
 echo "making fastq fromm SRA using fastq-dump.."
 
 #fastq-dump *.sra
-mkdir -p INPUT
-mv *INPUT.* INPUT/
 
 
 if [ $RSAINPUT == 1 ]
@@ -77,36 +74,59 @@ echo "Processing  $Sample ..."
 
 #Figuring out the Reference genome
 
+
+
+
+
+
+
+
+
+if [ $ATHENA == 1 ]
+then
+    REFDIR="/athena/elementolab/scratch/asd2007/Reference"
+    ANNOTDIR="/athena/elementolab/scratch/asd2007/Reference"
+    PICARDCONF="/home/asd2007/Scripts/picardmetrics.athena.conf"
+else
+    REFDIR="/zenodotus/dat01/melnick_bcell_scratch/asd2007/Reference"
+    ANNOTDIR="/zenodotus/dat01/melnick_bcell_scratch/asd2007/Reference"
+    PICARDCONF="/home/asd2007/Scripts/picardmetrics.conf"
+fi
+
 if [ $gtf_path == 1 ]
 then
-	#gtf="/zenodotus/dat02/elemento_lab_scratch/oelab_scratch_scratch007/akv3001/mm10_UCSC_ref.gtf"
-	#REF="/zenodotus/dat02/elemento_lab_scratch/oelab_scratch_scratch007/akv3001/Genomes/Homo_sapiens/UCSC/hg19/Sequence/BWAIndex"
-	REF="/zenodotus/dat02/elemento_lab_scratch/oelab_scratch_scratch007/akv3001/Genomes/Homo_sapiens/UCSC/hg19/Sequence/BWAIndex/genome"
-  REFbt2="/zenodotus/dat02/elemento_lab_scratch/oelab_scratch_scratch007/akv3001/Genomes/Homo_sapiens/UCSC/hg19/Sequence/Bowtie2Index"
-   # REFbt="/home/asd20i07/dat02/asd2007/Reference/Homo_sapiens/UCSC/mm10/Sequence/BowtieIndex/genome"
-  #  BLACK="/home/asd2007/dat02/asd2007/Reference/encodeBlack.bed"
-  BLACK="/home/asd2007/melnick_bcell_scratch/asd2007/Reference/hg19/Anshul_Hg19UltraHighSignalArtifactRegions.bed"
-  fetchChromSizes hg19 > hg19.chrom.sizes
-    chrsz="hg19.chrom.sizes"
-    "/home/asd2007/melnick_bcell_scratch/asd2007/Reference/hg19.genome.chrom.sizes"
-    RG="hg19"
+	REF="${REFDIR}/Homo_sapiens/UCSC/hg19/Sequence/BWAIndex"
+	REFbt2="${REFDIR}/Homo_sapiens/UCSC/hg19/Sequence/Bowtie2Index"
+  BLACK="${REFDIR}/hg19/wgEncodeDacMapabilityConsensusExcludable.bed.gz"
+  #fetchChromSizes hg19 > hg19.chrom.sizes
+  chrsz="/athena/elementolab/scratch/asd2007/Reference/hg19.chrom.sizes"
+  cp $chrsz $PWD/hg19.chrom.sizes
+  RG="hg19"
+  SPEC="hs"
+  REFGen="/athena/elementolab/scratch/asd2007/bin/bcbio/genomes/Hsapiens/hg19/seq/"
 elif [ $gtf_path == 2 ]
 then
 	gtf="/zenodotus/dat02/elemento_lab_scratch/oelab_scratch_scratch007/akv3001/Mus_UCSC_ref.gtf"
 	REF="/zenodotus/dat02/elemento_lab_scratch/oelab_scratch_scratch007/akv3001/Genomes/Mus_musculus/UCSC/mm10/Sequence/BWAIndex"
     REFbt2="/zenodotus/dat02/elemento_lab_scratch/oelab_scratch_scratch007/akv3001/Genomes/Mus_musculus/UCSC/mm10/Sequence/Bowtie2Index"
-    BLACK="/home/asd2007/dat02/asd2007/Reference/mm10-blacklist.bed"
+    BLACK="/athena/elementolab/scratch/asd2007/Reference/mm10-blacklist.bed"
     RG="mm10"
-    REFGen="/home/asd2007/melnick_bcell_scratch/asd2007/bin/bcbio/genomes/Mmusculus/mm10/seq/"
-    chrsz="/home/asd2007/melnick_bcell_scratch/asd2007/Reference/mm10.genome.chrom.sizes"
+    SPEC="mm"
+    REFGen="/athena/elementolab/scratch/asd2007/bin/bcbio/genomes/Mmusculus/mm10/seq/"
+    #chrsz="/athena/elementolab/scratch/asd2007/Reference/mm10.genome.chrom.sizes"
+    fetchChromSizes mm10 > mm10.chrom.sizes
+    chrsz= $PWD/mm10.chrom.sizes
+    rsync -av /home/asd2007/Scripts/picardmetrics.Mouse.conf ./
 else
 	gtf="/zenodotus/dat02/elemento_lab_scratch/oelab_scratch_scratch007/akv3001/mm10_UCSC_ref.gtf"
 	REF="/zenodotus/dat02/elemento_lab_scratch/oelab_scratch_scratch007/akv3001/Genomes/Homo_sapiens/UCSC/mm10/Sequence/BWAIndex/genome.fa"
 fi
 
+
+
 #rsync -a ${REF} ${TMPDIR}/
 
-rsync -a ${REFbt2} ${TMPDIR}/
+#rsync -a ${REFbt2} ${TMPDIR}/
 
 mkdir ${TMPDIR}/${Sample}
 
@@ -141,15 +161,15 @@ then
     mkdir -p $TMPDIR/INPUT
     cat ${TMPDIR}/*INPUT*.fastq.gz > ${TMPDIR}/INPUT/${Sample}.INPUT.fastq.gz
     rm ${TMPDIR}/*INPUT*.fastq.gz
-    bwa mem -t ${NSLOTS} ${REF}*.fa $TMPDIR/INPUT/${Sample}.INPUT.fastq.gz >  $TMPDIR/${Sample}.INPUT.sam 
-   # bowtie2  --very-sensitive-local -p ${NSLOTS} -x $TMPDIR/Bowtie2Index/genome -U $TMPDIR/INPUT/${Sample}.INPUT.fastq.gz -S $TMPDIR/${Sample}.INPUT.sam
-    samtools view -bS $TMPDIR/${Sample}.INPUT.sam | samtools sort  - -o $TMPDIR/${Sample}/${Sample}.INPUT.sorted.bam
-    rm *.sam
+    bwa mem -t ${NSLOTS} ${REF}*.fa $TMPDIR/INPUT/${Sample}.INPUT.fastq.gz | samtools view -bS - > $TMPDIR/${Sample}/${Sample}.INPUT.bam
+   
+    sambamba sort --memory-limit 35GB \
+             --nthreads ${NSLOTS} --tmpdir ${TMPDIR} --out $TMPDIR/${Sample}/${Sample}.INPUT.sorted.bam $TMPDIR/${Sample}/${Sample}.INPUT.bam
     samtools index $TMPDIR/${Sample}/${Sample}.INPUT.sorted.bam
     mkdir -p ${TMPDIR}/tmp
-    CONT=$TMPDIR/${Sample}/${Sample}.INPUT.sorted.bam
-    java -Xmx8g -jar /home/ole2001/PROGRAMS/SOFT/picard-tools-1.71/MarkDuplicates.jar REMOVE_DUPLICATES=true INPUT=$CONT METRICS_FILE=$TMPDIR/${Sample}/Input.dedup.txt OUTPUT=$TMPDIR/${Sample}/${Sample}.INPUT.sorted.nodup.bam VALIDATION_STRINGENCY=LENIENT ASSUME_SORTED=True
-    CONT="${TMPDIR}/${Sample}/${Sample}.INPUT.sorted.nodup.bam"
+    CONTA=$TMPDIR/${Sample}/${Sample}.INPUT.sorted.bam
+    picard MarkDuplicates REMOVE_DUPLICATES=true INPUT=$CONTA METRICS_FILE=$TMPDIR/${Sample}/Input.dedup.txt OUTPUT=${TMPDIR}/${Sample}/${Sample}.INPUT.sorted.nodup.bam VALIDATION_STRINGENCY=LENIENT ASSUME_SORTED=True
+    CONT=${TMPDIR}/${Sample}/${Sample}.INPUT.sorted.nodup.bam
     samtools index $CONT
 fi
 
@@ -198,8 +218,6 @@ fi
 
 
 echo "----------------------Remove duplicates--------------------"
-#Remove duplicates using picard
-#need to fix/rebuild picard
 
 mkdir -p ${TMPDIR}/tmp
 picard MarkDuplicates  INPUT=$TMPDIR/${Sample}/${Sample}.sorted.bam METRICS_FILE=$TMPDIR/${Sample}/dedup.txt REMOVE_DUPLICATES=true OUTPUT=$TMPDIR/${Sample}/${Sample}.sorted.nodup.bam VALIDATION_STRINGENCY=LENIENT ASSUME_SORTED=True
@@ -210,7 +228,8 @@ samtools index $TMPDIR/${Sample}/${Sample}.sorted.nodup.bam
 
 
 
-#java -Xmx4g -jar /home/akv3001/Programs/picard/dist/picard.jar MarkDuplicates INPUT=$TMPDIR/${Sample}/${Sample}.sorted.bam METRICS_FILE=$TMPDIR/${Sample}/dedup.txt \
+#java -Xmx4g -jar /home/akv3001/Programs/picard/dist/picard.jar
+
 #    OUTPUT=$TMPDIR/${Sample}/${Sample}.sorted.noDUPS.bam VALIDATION_STRINGENCY=LENIENT \
 #    ASSUME_SORTED=true REMOVE_DUPLICATES=true TMP_DIR=${TMPDIR}/tmp
 
@@ -221,16 +240,25 @@ samtools index $TMPDIR/${Sample}/${Sample}.sorted.nodup.bam
 
 echo "--------------------------Removing encode black listed intervals---------------------------"
 
-bedtools subtract -A -a $TMPDIR/${Sample}/${Sample}.sorted.nodup.bam -b $BLACK > $TMPDIR/${Sample}/${Sample}.sorted.nodup.black.bam
+rmBlack.sh $CONT
 
-samtools index $TMPDIR/${Sample}/${Sample}.sorted.nodup.black.bam
+
+CONT=$TMPDIR/${Sample}/${Sample}*INPUT*black.bam
+
+
+rmBlack.sh $TMPDIR/${Sample}/${Sample}.sorted.nodup.bam
+
+
+#bedtools subtract -A -a $TMPDIR/${Sample}/${Sample}.sorted.nodup.bam -b $BLACK > $TMPDIR/${Sample}/${Sample}.sorted.nodup.black.bam
+
+#samtools index $TMPDIR/${Sample}/${Sample}.sorted.nodup.black.bam
 
 
 
 #/home/ole2001/PROGRAMS/SOFT/bedtools2/bin/bamToBed -i $TMPDIR/${Sample}/${Sample}.sorted.nodup.black.bam  > $TMPDIR/${Sample}/${Sample}.sorted.nodup.black.bed
 
 
-rsync -a -r $TMPDIR/${Sample} $path/${Sample}
+#rsync -a -r $TMPDIR/${Sample} $path/${Sample}
 
 
 echo "------------------------------------------Call Peaks with MACS2--------------------------------------------"
@@ -247,10 +275,20 @@ echo "------------------------------------------Call Peaks with MACS2-----------
 #rsync -avP ${CONT} $TMPDIR/
 
 #CONT="/zenodotus/dat02/elemento_lab_scratch/oelab_scratch_scratch007/asd2007/Projects/DataSets/ChIPSeq/LY7_wendy/LY7_669/Sample_Ly7_Input_669/Ly7_INPUT_669.INPUT.sorted.nodup.bam"
+#CONT="/home/asd2007/zeno/Projects/DataSets/ChIPSeq/LY7_wendy/LY7_669/Sample_Ly7_Input_669/Ly7_INPUT_669.INPUT.sorted.nodup.bam"
+#CONT="/athena/elementolab/scratch/asd2007/Projects/DataSets/ChIPSeq/LY7_wendy/LY7_343/Sample_Ly7_Input_343/"
+
+
+
+
+
+
 samtools view -b ${CONT} | bamToBed -i stdin | awk 'BEGIN{FS="\t";OFS="\t"}{$4="N"; print $0}' | gzip -c > $TMPDIR/Input.tagAlign.gz
 
-samtools view -b $TMPDIR/${Sample}/${Sample}.sorted.nodup.bam | bamToBed -i stdin | awk 'BEGIN{FS="\t";OFS="\t"}{$4="N"; print $0}' | gzip -c > $TMPDIR/${Sample}/${Sample}.tagAlign.gz
+samtools view -b $TMPDIR/${Sample}/${Sample}.sorted.nodup.black.bam | bamToBed -i stdin | awk 'BEGIN{FS="\t";OFS="\t"}{$4="N"; print $0}' | gzip -c > $TMPDIR/${Sample}/${Sample}.tagAlign.gz
+
 #rsync -avP /home/asd2007/dat02/asd2007/Projects/barbieri/chipSeq/Sample_I_1/Sample_I_1/Sample_I_1.sorted.nodup.black.bam $TMPDIR/
+
 cp $TMPDIR/Input.tagAlign.gz $TMPDIR/${Sample}/${Sample}.Input.tagAlign.gz
 
 #macs2 callpeak -t $TMPDIR/${Sample}/${Sample}.tagAlign.gz -c $TMPDIR/Input.tagAlign.gz -f BED -n $TMPDIR/${Sample}/${Sample}.narrow -g hs -p 1e-3 --keep-dup all --call-summits --to-large --bdg
@@ -268,8 +306,8 @@ macs2 callpeak -t $TMPDIR/${Sample}/${Sample}.tagAlign.gz -c $TMPDIR/Input.tagAl
 rsync -r -a  $TMPDIR/${Sample} $path/${Sample}/
 
 
-
-fetchChromSizes hg19 > hg19.chrom.sizes
+cp /athena/elementolab/scratch/asd2007/Reference/hg19.chrom.sizes ./
+#fetchChromSizes hg19 > hg19.chrom.sizes
 
 prefix=$TMPDIR/${Sample}/${Sample}.narrow
 
@@ -291,7 +329,7 @@ rm ${Sample}/*.bedgraph
 
 rm ${prefix}*.bedgraph
 
-rsync -a ${prefix}_fc.bw /home/asd2007/melnick_bcell_scratch/asd2007/DATASETS/chipSeqSCORE/
+#rsync -a ${prefix}_fc.bw /zenodotus/dat01/melnick_bcell_scratch/asd2007/DATASETS/chipSeqSCORE
 
 #slopBed -i ${prefix}_FE.bdg -g $chrsz -b 0 | bedClip stdin $chrsz ${prefix}.FE.bedGraph
 

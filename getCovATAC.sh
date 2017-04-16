@@ -4,13 +4,12 @@
 #$ -m a
 #$ -cwd
 #$ -M ashley.doane@gmail.com
-#$ -l zenodotus=true
-#$ -l os=rhel6.3
-#$ -l h_rt=3:50:00
-#$ -pe smp 8-32
-#$ -l h_vmem=12G
+#$ -l athena=true
+#$ -l h_rt=13:50:00
+#$ -pe smp 6-8
+#$ -l h_vmem=5G
 #$ -R y
-
+#$ -o /home/asd2007/joblogs
 
 path=$1
 
@@ -36,15 +35,17 @@ Sample=${Sample%%.*}
 
 #rsync -r -v -a -z $path/$file/*.fastq ./
 
-rsync -r -v -a -z $path/$file/${Sample}/*.sorted.nodup.noM.black.bam ./
+rsync  -v -a  $path/$file/${Sample}/*.sorted.nodup.noM.bam ./
+
+rmBlack.sh ${Sample}.sorted.nodup.noM.bam 
 
 #rsync -r -v -a -z $path/$file ./
 
 #rsync -r -v -a -z $file/ ./
 
-mv *.bam ${Sample}.bam
+#mv *.black.bam ${Sample}.bam
 
-samtools index ${Sample}.bam
+#samtools index ${Sample}.bam
 
 #atlas=$2 #bed file with windows in which to to count inserts
 
@@ -71,7 +72,7 @@ echo "Processing  $Sample ..."
 
 
 echo "---------- indexing bam file  -------------"
-samtools index ${TMPDIR}/${Sample}.bam
+samtools index ${TMPDIR}/${Sample}.sorted.nodup.noM.black.bam
 echo "----------counting Tn5 insertions -------------"
 #Use bwa mem to align each pair in data set
 
@@ -98,21 +99,25 @@ echo "----------counting Tn5 insertions -------------"
 #rsync -r -v $TMPDIR/${Sample}*.bw /zenodotus/dat01/melnick_bcell_scratch/asd2007/COVERAGE/ATAC/coverage/test/
 
 
-BED="/home/asd2007/dat02/asd2007/Projects/DataSets/atacData/ATAC-AML/cellAtlas.bed"
+#BED="/athena/elementolab/scratch/asd2007/Projects/DataSets/atacData/atacLY7/WTidr.IDR0.1.filt.narrowPeak"
+#BED="/athena/elementolab/scratch/asd2007/Projects/HOMER/Homer.input/LY7idr.atlas.peakSummits300.bed"
+
+BED="/athena/elementolab/scratch/asd2007/Projects/HOMER/Homer.input/LY7idr.atlas.peakSummits300reduced.bed"
 
 
-
-pyatac counts --bam ${TMPDIR}/${Sample}.bam --bed ${BED} --out ${Sample}.ins
+pyatac counts --bam ${TMPDIR}/${Sample}.sorted.nodup.noM.black.bam --bed ${BED} --out ${Sample}.ins
 #bedtools multicov -split -bams $BAMS -bed $BED
+
+rsync -a -v $TMPDIR/${Sample}* /athena/elementolab/scratch/asd2007/Projects/DataSets/atacData/atacLY7/bams/
 
 LIBS=$(zcat ${Sample}.ins.counts.txt.gz  | awk '{sum +=$1} END  {printf sum}')
 
-let KM=2000000 #1 million * bin size in kb
+let KM=20000000 #1 million * bin size in kb
 let LIBZ=$LIBS/$KM
 
 
 
-bamCoverage --bam ${TMPDIR}/${Sample}.bam --binSize 20 \
+bamCoverage --bam ${TMPDIR}/${Sample}.sorted.nodup.noM.black.bam --binSize 20 \
     --outFileFormat bigwig --smoothLength 150  \
     --scaleFactor $LIBZ \
     -o ${TMPDIR}/$Sample.readsInPeaks.bin20.centered.smooth.150.max150f.bw --numberOfProcessors ${NSLOTS} \
@@ -121,18 +126,18 @@ bamCoverage --bam ${TMPDIR}/${Sample}.bam --binSize 20 \
 
 
 
-bamCoverage --bam ${TMPDIR}/${Sample}.bam --binSize 20 \
-    --outFileFormat bigwig --smoothLength 150  \
-    --scaleFactor $LIBZ \
-    -o ${TMPDIR}/$Sample.readsInPeaks.bin20.centered.smooth.150.max500f.bw --numberOfProcessors ${NSLOTS} \
-    --maxFragmentLength 500 \
-    --centerReads --extendReads
+#bamCoverage --bam ${TMPDIR}/${Sample}.bam --binSize 20 \
+#    --outFileFormat bigwig --smoothLength 150  \
+#    --scaleFactor $LIBZ \
+#    -o ${TMPDIR}/$Sample.readsInPeaks.bin20.centered.smooth.150.max500f.bw --numberOfProcessors ${NSLOTS} \
+#    --maxFragmentLength 500 \
+#    --centerReads --extendReads
 
 
-let KM=500000 #1 million * bin size in kb
+let KM=5000000 #1 million * bin size in kb
 let LIBZ=$LIBS/$KM
 
-bamCoverage --bam ${TMPDIR}/${Sample}.bam --binSize 5 \
+bamCoverage --bam ${TMPDIR}/${Sample}.sorted.nodup.noM.black.bam --binSize 5 \
     --outFileFormat bigwig --smoothLength 150  \
     --scaleFactor $LIBZ \
     -o ${TMPDIR}/$Sample.readsInPeaks.bin5.centered.smooth.150.bw --numberOfProcessors ${NSLOTS} \
@@ -140,17 +145,17 @@ bamCoverage --bam ${TMPDIR}/${Sample}.bam --binSize 5 \
     --centerReads --extendReads
 
 
-bamCoverage --bam ${TMPDIR}/${Sample}.bam --binSize 5 \
-    --outFileFormat bigwig --smoothLength 150  \
-    --scaleFactor $LIBZ \
-    -o ${TMPDIR}/$Sample.readsInPeaks.bin5.centered.smooth.150.max500.bw --numberOfProcessors ${NSLOTS} \
-    --maxFragmentLength 500 \
-    --centerReads --extendReads
+#bamCoverage --bam ${TMPDIR}/${Sample}.bam --binSize 5 \
+#    --outFileFormat bigwig --smoothLength 150  \
+#    --scaleFactor $LIBZ \
+#    -o ${TMPDIR}/$Sample.readsInPeaks.bin5.centered.smooth.150.max500.bw --numberOfProcessors ${NSLOTS} \
+#    --maxFragmentLength 500 \
+#    --centerReads --extendReads
     #pyatac ins --bam $bam --bed $bed --
 
 #path="/zenodotus/dat02/elemento_lab_scratch/oelab_scratch_scratch007/akv3001/Jon_bwa_mm10_output"
 
-rsync -r -v $TMPDIR/${Sample}* /zenodotus/dat01/melnick_bcell_scratch/asd2007/COVERAGE/AWS.OE/BCell_Hub/hg19/atacEC3986/
+rsync -a -v $TMPDIR/${Sample}* /athena/elementolab/scratch/asd2007/Projects/DataSets/atacData/atacLY7/bams/  
 
 
 

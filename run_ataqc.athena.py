@@ -185,8 +185,7 @@ def get_gc(qsorted_bam_file, reference_fasta, prefix):
     output_file = '{0}_gc.txt'.format(prefix)
     plot_file = '{0}_gcPlot.pdf'.format(prefix)
     summary_file = '{0}_gcSummary.txt'.format(prefix)
-    get_gc_metrics = ('java -Xmx4G -jar '
-                      '{5}/picard.jar '
+    get_gc_metrics = ('picard '
                       'CollectGcBiasMetrics R={0} I={1} O={2} '
                       'VERBOSITY=ERROR QUIET=TRUE '
                       'ASSUME_SORTED=FALSE '
@@ -194,8 +193,7 @@ def get_gc(qsorted_bam_file, reference_fasta, prefix):
                                                 qsorted_bam_file,
                                                 output_file,
                                                 plot_file,
-                                                summary_file,
-                                                os.environ['PICARDROOT'])
+                                                summary_file)
     logging.info(get_gc_metrics)
     os.system(get_gc_metrics)
     return output_file, plot_file, summary_file
@@ -326,11 +324,12 @@ def get_picard_complexity_metrics(aligned_bam, prefix):
                       'QUIET=TRUE').format(aligned_bam,
                                            out_file,
                                            os.environ['PICARDROOT'])
-    os.system(get_gc_metrics)
-
+    if not os.path.exists(out_file):
+        os.system(get_gc_metrics)
     # Extract the actual estimated library size
     header_seen = False
     est_library_size = 0
+
     with open(out_file, 'rb') as fp:
         for line in fp:
             if header_seen:
@@ -340,7 +339,6 @@ def get_picard_complexity_metrics(aligned_bam, prefix):
                 header_seen = True
 
     return est_library_size
-
 
 def preseq_plot(data_file):
     '''
@@ -525,20 +523,18 @@ def get_mito_dups(sorted_bam, prefix, endedness='Paired-ended', use_sambamba=Fal
     os.system(filter_bam)
 
     # Run Picard MarkDuplicates
-    mark_duplicates = ('java -Xmx4G -jar '
-                       '{0}/picard.jar '
-                       'MarkDuplicates INPUT={1} OUTPUT={2} '
-                       'METRICS_FILE={3} '
+    mark_duplicates = ('picard '
+                       'MarkDuplicates INPUT={0} OUTPUT={1} '
+                       'METRICS_FILE={2} '
                        'VALIDATION_STRINGENCY=LENIENT '
                        'ASSUME_SORTED=TRUE '
                        'REMOVE_DUPLICATES=FALSE '
                        'VERBOSITY=ERROR '
-                       'QUIET=TRUE').format(os.environ['PICARDROOT'],
-                                            tmp_filtered_bam,
+                       'QUIET=TRUE').format(tmp_filtered_bam,
                                             out_file,
                                             metrics_file)
     if use_sambamba:
-        mark_duplicates = ('sambamba markdup -t 8 '
+        mark_duplicates = ('sambamba markdup -t ${NSLOTS} '
                            '--hash-table-size=17592186044416 '
                            '--overflow-list-size=20000000 '
                            '--io-buffer-size=256 '
@@ -568,7 +564,7 @@ def get_mito_dups(sorted_bam, prefix, endedness='Paired-ended', use_sambamba=Fal
     remove_metrics_file = 'rm {0}'.format(metrics_file)
     #os.system(remove_metrics_file)
     remove_tmp_filtered_bam = 'rm {0}'.format(tmp_filtered_bam)
-    #os.system(remove_tmp_filtered_bam)
+    os.system(remove_tmp_filtered_bam)
 
     return mito_dups, float(mito_dups) / total_dups
 
@@ -632,15 +628,13 @@ def get_insert_distribution(final_bam, prefix):
     logging.info('insert size distribution...')
     insert_data = '{0}.inserts.hist_data.log'.format(prefix)
     insert_plot = '{0}.inserts.hist_graph.pdf'.format(prefix)
-    graph_insert_dist = ('java -Xmx4G -jar '
-                         '{3}/picard.jar '
+    graph_insert_dist = ('picard '
                          'CollectInsertSizeMetrics '
                          'INPUT={0} OUTPUT={1} H={2} '
                          'VERBOSITY=ERROR QUIET=TRUE '
                          'W=1000 STOP_AFTER=5000000').format(final_bam,
                                                              insert_data,
-                                                             insert_plot,
-                                                             os.environ['PICARDROOT'])
+                                                             insert_plot)
     logging.info(graph_insert_dist)
     os.system(graph_insert_dist)
     return insert_data, insert_plot
@@ -1326,7 +1320,7 @@ def parse_args():
     parser.add_argument('--idr_peaks')
     parser.add_argument('--use_sambamba_markdup', action='store_true',
                         help='Use sambamba markdup instead of Picard')
-
+    parser.add_argument('--processes')
     args = parser.parse_args()
 
     # Set up all variables
@@ -1376,12 +1370,21 @@ def parse_args():
         NAIVE_OVERLAP_PEAKS = args.naive_overlap_peaks
         IDR_PEAKS = args.idr_peaks
         USE_SAMBAMBA_MARKDUP = args.use_sambamba_markdup
+        NSLOTS = args.processes
 
     return NAME, OUTPUT_PREFIX, REF, TSS, DNASE, BLACKLIST, PROM, ENH, \
         REG2MAP_BED, REG2MAP, ROADMAP_META, GENOME, FASTQ, ALIGNED_BAM, \
         ALIGNMENT_LOG, COORDSORT_BAM, DUP_LOG, PBC_LOG, FINAL_BAM, \
         FINAL_BED, BIGWIG, PEAKS, NAIVE_OVERLAP_PEAKS, IDR_PEAKS, \
-        USE_SAMBAMBA_MARKDUP
+        USE_SAMBAMBA_MARKDUP, NSLOTS
+
+def setup_yaml():
+    """ http://stackoverflow.com/a/8661021 """
+    represent_dict_order = lambda self, data:  self.represent_mapping('tag:yaml.org,2002:map', data.items())
+    yaml.add_representer(OrderedDict, represent_dict_order)
+
+
+
 
 
 def main():
@@ -1390,7 +1393,7 @@ def main():
     [NAME, OUTPUT_PREFIX, REF, TSS, DNASE, BLACKLIST, PROM, ENH, REG2MAP_BED, REG2MAP,
      ROADMAP_META, GENOME, FASTQ, ALIGNED_BAM, ALIGNMENT_LOG, COORDSORT_BAM,
      DUP_LOG, PBC_LOG, FINAL_BAM, FINAL_BED, BIGWIG, PEAKS,
-     NAIVE_OVERLAP_PEAKS, IDR_PEAKS, USE_SAMBAMBA_MARKDUP] = parse_args()
+     NAIVE_OVERLAP_PEAKS, IDR_PEAKS, USE_SAMBAMBA_MARKDUP, NSLOTS] = parse_args()
 
     # Set up the log file and timing
     logging.basicConfig(filename='test.log', level=logging.DEBUG)
@@ -1450,7 +1453,7 @@ def main():
                                                              TSS,
                                                              OUTPUT_PREFIX,
                                                              GENOME,
-                                                             read_len)
+                                                             read_len, 400, 2000, NSLOTS)
 
     # Signal to noise: reads in DHS regions vs not, reads falling
     # into blacklist regions
@@ -1578,6 +1581,20 @@ def main():
     results = open('{0}_qc.html'.format(OUTPUT_PREFIX), 'w')
     results.write(html_template.render(sample=SAMPLE))
     results.close()
+
+    import yaml
+
+    mydatafile = '{0}_qc.yaml'.format(OUTPUT_PREFIX),
+    setup_yaml()
+
+    with open(mydatafile, "w") as f:
+        yaml.dump(SAMPLE, f)
+
+   # with open(mydatafile, "w") as f:
+   #     yaml.dump(SAMPLE, f)
+
+    print yaml.dump(SAMPLE)
+
 
     # Also produce a text file of relevant stats (so that another module
     # can combine the stats) and put in using ordered dictionary

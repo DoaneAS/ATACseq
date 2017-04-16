@@ -3,12 +3,12 @@
 #$ -j y
 #$ -m e
 #$ -cwd
-### -l zenodotus=true
+###$ -l zeno=true
 #$ -l athena=true
 #$ -M ashley.doane@gmail.com
-###$ -l h_rt=42:00:00
-#$ -pe smp 8-12
-#$ -l h_vmem=10G
+#$ -l h_rt=38:00:00
+#$ -pe smp 4-8
+#$ -l h_vmem=6G
 #$ -R y
 #$ -o /home/asd2007/joblogs
 
@@ -19,6 +19,7 @@ BT2ALN=1 # bt2 recommnded!
 ATHENA=1
 ##############################
 
+#source /softlib/apps/EL6/R-v3.3.0/env
 
 path=$1 #path to all the Samples
 gtf_path=$2 #Number indicating the reference gtf [1 for Human 2 for Mouse 3 for other]
@@ -36,9 +37,9 @@ Sample=$(basename "$file")
 Sample=${Sample%%.*}
 
 
-#rsync -r -v -a  $path/$file/*.gz ./
+rsync -r -v -a  $path/$file/*.gz ./
 #rsync -r -v -a -z $path/$file/*.sra ./
-rsync -r -v -a -z $path/$file/* ./
+#rsync -r -v -a $path/$file/* ./
 #SRA=$(ls *.sra)
 
 mkdir -p ${Sample}
@@ -69,14 +70,13 @@ if [ $gtf_path == 1 ]
 then
 	REF="${REFDIR}/Homo_sapiens/UCSC/hg19/Sequence/BWAIndex"
 	REFbt2="${REFDIR}/Homo_sapiens/UCSC/hg19/Sequence/Bowtie2Index"
-  BLACK="${REFDIR}/hg19/wgEncodeDacMapabilityConsensusExcludable.bed.gz" \
-  fetchChromSizes hg19 > hg19.chrom.sizes
-  chrsz= $PWD/hg19.chrom.sizes
+  BLACK="${REFDIR}/hg19/wgEncodeDacMapabilityConsensusExcludable.bed.gz"
+  #fetchChromSizes hg19 > hg19.chrom.sizes
+  chrsz="/athena/elementolab/scratch/asd2007/Reference/hg19.chrom.sizes"
+  cp $chrsz $PWD/hg19.chrom.sizes
   RG="hg19"
   SPEC="hs"
   REFGen="/athena/elementolab/scratch/asd2007/bin/bcbio/genomes/Hsapiens/hg19/seq/"
-  rsync -av ./
-
 elif [ $gtf_path == 2 ]
 then
 	gtf="/zenodotus/dat02/elemento_lab_scratch/oelab_scratch_scratch007/akv3001/Mus_UCSC_ref.gtf"
@@ -96,8 +96,8 @@ else
 fi
 
 
-rsync -avP ${REF} $TMPDIR/
-rsync -avP ${REFbt2} $TMPDIR/
+#rsync -avP ${REF} $TMPDIR/
+rsync -av ${REFbt2} $TMPDIR/
 
 mkdir -p ${TMPDIR}/${Sample}
 
@@ -105,16 +105,30 @@ echo "ls of pwd is"
 ls -lrth
 
 
+#find *_L00*_R1_001.fastq.gz | sed 's/_R1_001.fastq.gz$//' |parallel 'trimAdapters.py -a {}_R1_001.fastq.gz -b {}_R2_001.fastq.gz'
 
-if [ $TRIM == 1 ]
+#'cutadapt -a adaptors_to_trim -A adaptors_to_trim -q 20 --minimum-length 5 -o {}_R1_cutadapt.fastq.gz -p {}_R2_cutadapt.fastq.gz {}_R1.fastq.gz {}_R2.fastq.gz &> {}.cutadapt'
+
+#cat *R1.trim.fastq > ${Sample}.R1.trim.fastq
+#cat *R2.trim.fastq > ${Sample}.R2.trim.fastq
+
+if [ $TRIM = 1 ]
 then
     echo "Trimming adapter sequences, with command..."
-    cat *_R1*.fastq.gz > ${Sample}.R1.fastq.gz
-    cat *_R2*.fastq.gz > ${Sample}.R2.fastq.gz
-    trimAdapters.py -a ${Sample}.R1.fastq.gz -b ${Sample}.R2.fastq.gz
+
+    #find *_L00*_R1_001.fastq.gz | sed 's/_R1_001.fastq.gz$//' |parallel -j ${NSLOTS} 'trimAdapters.py -a {}_R1_001.fastq.gz -b {}_R2_001.fastq.gz'
+
+    find *_R1_001.fastq.gz | sed 's/_R1_001.fastq.gz$//' |parallel -j ${NSLOTS} 'trimAdapters.py -a {}_R1_001.fastq.gz -b {}_R2_001.fastq.gz'
+
+    cat *_R1_001.trim.fastq > ${Sample}.R1.trim.fastq
+    cat *_R2_001.trim.fastq > ${Sample}.R2.trim.fastq
+
+#    cat *_R1*.fastq.gz > ${Sample}.R1.fastq.gz
+ #   cat *_R2*.fastq.gz > ${Sample}.R2.fastq.gz
+  #  trimAdapters.py -a ${Sample}.R1.fastq.gz -b ${Sample}.R2.fastq.gz
     echo "completed trimming"
-    rm ${Sample}.R1.fastq.gz
-    rm ${Sample}.R2.fastq.gz
+   # rm ${Sample}.R1.fastq.gz
+   # rm ${Sample}.R2.fastq.gz
     pigz -p $NSLOTS -c $TMPDIR/${Sample}.R1.trim.fastq > $TMPDIR/${Sample}.R1.trim.fastq.gz
     pigz -p $NSLOTS -c $TMPDIR/${Sample}.R2.trim.fastq > $TMPDIR/${Sample}.R2.trim.fastq.gz
     rsync -av $TMPDIR/${Sample}.R1.trim.fastq.gz ${path}/${Sample}
@@ -122,35 +136,45 @@ then
 else
     echo "will not perform adapter sequence trimming of reads"
     #gunzip *.gz
-      mv *.R1*fastq.gz $TMPDIR/${Sample}.R1.trim.fastq.gz
-      mv *.R2*fastq.gz $TMPDIR/${Sample}.R2.trim.fastq.gz
+      #cat *R1.trim.fastq.gz >  $TMPDIR/${Sample}.R1.trim.fastq.gz
+      #cat *R2.trim.fastq.gz > $TMPDIR/${Sample}.R2.trim.fastq.gz
+      #mkdir R1
+      #mkdir R2
+      #cat ${Sample}.R1.trim.fastq.gz >  $TMPDIR/${Sample}.R1.trim.fastq.gz
+      #cat ${Sample}.R2.trim.fastq.gz > $TMPDIR/${Sample}.R2.trim.fastq.gz
       echo "fastq files to align"
-      ls $TMPDIR/${Sample}.R*.trim.fastq.gz
+      #ls $TMPDIR/${Sample}.R*.trim.fastq.gz
 fi
 
 
-#bowtie2  -X 2000 -p ${NSLOTS} -x $TMPDIR/Bowtie2Index/genome -1 $TMPDIR/R1/${Sample}.R1.fq -2 $TMPDIR/R2/${Sample}.R2.fq -S $TMPDIR/${Sample}/${Sample}.bt2.sam
-
-
-
-if [ $BT2ALN == 1 ]
+if [ $BT2ALN = 1 ]
 then
     echo "----------bowtie2 aligning-------------"
     bowtie2 -X 2000 --threads ${NSLOTS} -x $TMPDIR/Bowtie2Index/genome  \
-            -1 $TMPDIR/${Sample}.R1.trim.fastq.gz -2 $TMPDIR/${Sample}.R2.trim.fastq.gz 2> ${Sample}/${Sample}.align.log| \
+            -1 $TMPDIR/${Sample}.R1.trim.fastq.gz -2 $TMPDIR/${Sample}.R2.trim.fastq.gz 2> ${Sample}/${Sample}.align.log | \
         samtools view -bS - > $TMPDIR/${Sample}/${Sample}.bam
+    echo $(cat ${Sample}/${Sample}.align.log)
 else
     echo "----------bwa-mem aligning-------------"
     echo "aligning : $TMPDIR/${Sample}.R1.trim.fq ,  $TMPDIR/${Sample}.R2.trim.fq using bwa-mem.."
-    #bwa mem -t ${NSLOTS} -M $TMPDIR/BWAIndex/genome.fa $TMPDIR/${Sample}.R1.trim.fastq $TMPDIR/${Sample}.R2.trim.fastq | samtools view -bS - >  $TMPDIR/${Sample}.bam
+    bwa mem -t ${NSLOTS} -M ${REF}/genome.fa $TMPDIR/${Sample}.R1.trim.fastq.gz $TMPDIR/${Sample}.R2.trim.fastq.gz | samtools view -bS - >  $TMPDIR/${Sample}/${Sample}.bam
 fi
 
 echo "----------Processing alignment and filtering for duplicates and mitochondrial mapping reads-----------------"
 
+
+
+
+rsync -a -v $TMPDIR/${Sample} $path/${Sample}
+
 processBamAlignment.sh $TMPDIR/${Sample}/${Sample}.bam
 
-samtools sort -n $TMPDIR/${Sample}/${Sample}.sorted.nodup.noM.bam -o $TMPDIR/${Sample}/${Sample}.nsorted.nodup.noM.bam
-FINAL_BAM='${TMPDIR}/${Sample}/${Sample}.sorted.nodup.noM.bam'
+sambamba sort --memory-limit 30GB -n \
+         -t ${NSLOTS} --out $TMPDIR/${Sample}/${Sample}.nsorted.nodup.noM.bam $TMPDIR/${Sample}/${Sample}.sorted.nodup.noM.black.bam
+
+# ALL bams below have blackList regions removed
+
+FINAL_BAM='${TMPDIR}/${Sample}/${Sample}.sorted.nodup.noM.black.bam'
 
 
 samtools fixmate $TMPDIR/${Sample}/${Sample}.nsorted.nodup.noM.bam $TMPDIR/${Sample}/${Sample}.nsorted.fixmate.nodup.noM.bam
@@ -162,7 +186,7 @@ samtools view -H $TMPDIR/${Sample}/${Sample}.sorted.nodup.noM.bam | grep chr | g
 
 echo "----------Finsihed Processing Bam Files-----------------"
 
-rsync -avP $TMPDIR/${Sample} $path/${Sample}
+#rsync -avP $TMPDIR/${Sample} $path/${Sample}
 rsync -r -a -v $TMPDIR/${Sample} $path/${Sample}
 
 
@@ -187,11 +211,27 @@ sort -k 8gr,8gr $TMPDIR/${Sample}/${Sample}.tag.broad_peaks.broadPeak | awk 'BEG
 
 sort -k 14gr,14gr $TMPDIR/${Sample}/${Sample}.tag.broad_peaks.gappedPeak | awk 'BEGIN{OFS="\t"}{$4="Peak_"NR ; print $0}' | gzip -nc > $TMPDIR/${Sample}/${Sample}.tn5.pf.gappedPeak.gz
 
+mkdir -p $TMPDIR/${Sample}/peaks
 
 
+cp $TMPDIR/${Sample}/${Sample}.tag*Peak  $TMPDIR/${Sample}/peaks/
+cp $TMPDIR/${Sample}/${Sample}.tn5*Peak.gz  $TMPDIR/${Sample}/peaks/
+
+
+
+getFrip.sh ${TMPDIR}/${Sample}/${Sample}.sorted.nodup.noM.black.bam $TMPDIR/${Sample}/peaks/${Sample}.tag.broad_peaks.broadPeak
+
+
+
+
+rsync -r -a -v $TMPDIR/${Sample} $path/${Sample}
 echo "------------------------------------------Call Peaks with MACS2 ON PSEUDOREPLICTES--------------------------------------------"
 
-callPeaks.sh $TMPDIR/${Sample}/${Sample}.nodup.bedpe.gz ${Sample} hs
+callPeaks.sh $TMPDIR/${Sample}/${Sample}.nodup.bedpe.gz ${Sample} $SPEC
+
+
+rsync -r -a -v $TMPDIR/${Sample} $path/${Sample}
+
 
 mkdir -p $TMPDIR/${Sample}/bamPE
 
@@ -208,18 +248,19 @@ mkdir -p ${Sample}/QCmetrics/filtered
 
 pyatac sizes --bam $TMPDIR/${Sample}/${Sample}.sorted.nodup.noM.bam --upper 1000 --out $TMPDIR/${Sample}/QCmetrics/${Sample}.filtered
 
+
+picardmetrics run -f $PICARDCONF -o $TMPDIR/${Sample}/QCmetrics/filtered $TMPDIR/${Sample}/${Sample}.sorted.nodup.noM.black.bam
+
 picardmetrics run -f $PICARDCONF -o $TMPDIR/${Sample}/QCmetrics/raw $TMPDIR/${Sample}/${Sample}.sorted.bam
 
-picardmetrics run -f $PICARDCONF -o $TMPDIR/${Sample}/QCmetrics/filtered $TMPDIR/${Sample}/${Sample}.sorted.nodup.noM.bam
-
-cp $TMPDIR/${Sample}/QCmetrics/filtered/*.EstimateLibraryComplexity.log $TMPDIR/${Sample}/QCmetrics/${Sample}.picardcomplexity.qc
-cp $TMPDIR/${Sample}/QCmetrics/filtered/*.EstimateLibraryComplexity.log $TMPDIR/${Sample}/${Sample}.picardcomplexity.qc
+cp $TMPDIR/${Sample}/QCmetrics/raw/*.EstimateLibraryComplexity.log $TMPDIR/${Sample}/QCmetrics/${Sample}.picardcomplexity.qc
+#cp $TMPDIR/${Sample}/QCmetrics/filtered/*.EstimateLibraryComplexity.log $TMPDIR/${Sample}/${Sample}.picardcomplexity.qc
 
 samtools flagstat  $TMPDIR/${Sample}/${Sample}.sorted.bam > $TMPDIR/${Sample}/QCmetrics/raw/${Sample}.sorted.flagstat.txt
 samtools flagstat $TMPDIR/${Sample}/${Sample}.sorted.nodup.noM.bam > $TMPDIR/${Sample}/QCmetrics/filtered/${Sample}.sorted.nodup.noM.flagstat.txt
 
 getchrM $TMPDIR/${Sample}/${Sample}.sorted.nodup.noM.bam > $TMPDIR/${Sample/}QCmetrics/${Sample}.sorted.nodup.noM.bam.chrM.txt
-getchrM $TMPDIR/${Sample}/${Sample}.sorted.bam > $TMPDIR/$Sample}/QCmetrics/${Sample}.sorted.bam.chrM.txt
+getchrM $TMPDIR/${Sample}/${Sample}.sorted.bam > $TMPDIR/${Sample}/QCmetrics/${Sample}.sorted.bam.chrM.txt
 
 
 echo "----------- compute fragment midpoint coverage per bp ------------------"
@@ -252,26 +293,26 @@ rsync -r -a -v $TMPDIR/${Sample} $path/${Sample}
 
 
 # Peak atlas using Chang data and B cells
-BED="/athena/elementolab/scratch/asd2007/Projects/DataSets/atacData/ATAC-AML/AML/cellAtlas.bed"
+#BED="/athena/elementolab/scratch/asd2007/Projects/DataSets/atacData/ATAC-AML/AML/cellAtlas.bed"
 
 #BED="/athena/elementolab/scratch/asd2007/Projects/DataSets/atacData/atacCN1/project/cellAtlas.CN1.bed"
 
 
-pyatac counts --bam  $TMPDIR/${Sample}/${Sample}.sorted.nodup.noM.bam --bed ${BED} --out $TMPDIR/${Sample}/${Sample}.150.ins --upper 150
+#pyatac counts --bam  $TMPDIR/${Sample}/${Sample}.sorted.nodup.noM.bam --bed ${BED} --out $TMPDIR/${Sample}/${Sample}.150.ins --upper 150
 ##bedtools multicov -split -bams $BAMS -bed $BED
 
-pyatac counts --bam  $TMPDIR/${Sample}/${Sample}.sorted.nodup.noM.bam --bed ${BED} --out $TMPDIR/${Sample}/${Sample}.ins
-LIBS=$(zcat ${Sample}/${Sample}.ins.counts.txt.gz  | awk '{sum +=$1} END  {printf sum}')
+#pyatac counts --bam  $TMPDIR/${Sample}/${Sample}.sorted.nodup.noM.bam --bed ${BED} --out $TMPDIR/${Sample}/${Sample}.ins
+#LIBS=$(zcat ${Sample}/${Sample}.ins.counts.txt.gz  | awk '{sum +=$1} END  {printf sum}')
 
-let KM=2000000 #1 million * bin size in kb
-let LIBZ=$LIBS/$KM
+#let KM=2000000 #1 million * bin size in kb
+#let LIBZ=$LIBS/$KM
 
-bamCoverage --bam  $TMPDIR/${Sample}/${Sample}.sorted.nodup.noM.bam --binSize 20 \
-    --outFileFormat bigwig --smoothLength 150  \
-    --scaleFactor $LIBZ \
-    -o ${TMPDIR}/${Sample}/$Sample.readsInPeaks.bin20.centered.smooth.150.max150f.bw --numberOfProcessors ${NSLOTS} \
-    --maxFragmentLength 150 \
-    --centerReads --extendReads
+#bamCoverage --bam  $TMPDIR/${Sample}/${Sample}.sorted.nodup.noM.bam --binSize 20 \
+#    --outFileFormat bigwig --smoothLength 150  \
+#    --scaleFactor $LIBZ \
+#    -o ${TMPDIR}/${Sample}/$Sample.readsInPeaks.bin20.centered.smooth.150.max150f.bw --numberOfProcessors ${NSLOTS} \
+#    --maxFragmentLength 150 \
+#    --centerReads --extendReads
 
 
 
@@ -304,16 +345,16 @@ bamCoverage --bam  $TMPDIR/${Sample}/${Sample}.sorted.nodup.noM.bam --binSize 20
 
 rsync -r -a -v $TMPDIR/${Sample} $path/${Sample}
 
-mkdir -p /athena/elementolab/scratch/asd2007/Projects/DataSets/COVERAGE
+#mkdir -p /athena/elementolab/scratch/asd2007/Projects/DataSets/COVERAGE
 
-mkdir -p /athena/elementolab/scratch/asd2007/Projects/DataSets/COVERAGE/AWS.OE
+#mkdir -p /athena/elementolab/scratch/asd2007/Projects/DataSets/COVERAGE/AWS.OE
 
-mkdir -p /athena/elementolab/scratch/asd2007/Projects/DataSets/COVERAGE/AWS.OE/${Sample}
+#mkdir -p /athena/elementolab/scratch/asd2007/Projects/DataSets/COVERAGE/AWS.OE/${Sample}
 
-rsync -r -a -v $TMPDIR/${Sample}/*.bw  /athena/elementolab/scratch/asd2007/Projects/DataSets/COVERAGE/AWS.OE/${Sample}
+#rsync -r -a -v $TMPDIR/${Sample}/*.bw  /athena/elementolab/scratch/asd2007/Projects/DataSets/COVERAGE/AWS.OE/${Sample}
 
-sambamba sort --nthreads --memory-limit 40GB \
-         --nthreads ${NSLOTS} --tmpdir ${TMPDIR} --out ${TMPDIR}/${Sample}/${Sample}.bam ${TMPDIR}/${Sample}/${Sample}.bam
+sambamba sort --nthreads --memory-limit 30GB \
+         --nthreads ${NSLOTS} --tmpdir ${TMPDIR} --out ${TMPDIR}/${Sample}/${Sample}.sorted.bam ${TMPDIR}/${Sample}/${Sample}.bam
 
 samtools index $TMPDIR/${Sample}/${Sample}.sorted.bam 
 
@@ -321,7 +362,7 @@ cp $TMPDIR/${Sample}/${Sample}.sorted.bam $TMPDIR/${Sample}/${Sample}.bam
 
 cp $TMPDIR/${Sample}/${Sample}.sorted.bam.bai $TMPDIR/${Sample}/${Sample}.bam.bai
 
-mkdir ${Sample}/IDR
+mkdir -p ${Sample}/IDR
 
 ### IDR
 
@@ -334,6 +375,16 @@ rsync -avP $TMPDIR/${Sample} $path/${Sample}
 rsync -r -a -v $TMPDIR/${Sample} $path/${Sample}
 
 source deactivate
+
+
+
+
+
+
+
+
+
+
 
 #################
 ################
@@ -407,7 +458,7 @@ GENOME='hg19' # This is the only genome that currently works
 SAMPLE="$Sample"
 
 PBC="${WORKDIR}/$SAMPLE.pbc.qc"
-FINAL_BAM="${Sample}/${Sample}.sorted.nodup.noM.bam"
+FINAL_BAM="${Sample}/${Sample}.sorted.nodup.noM.black.bam"
 FINAL_BED="${Sample}/${Sample}.nodup.tn5.tagAlign.gz"
 
 F1="${Sample}.R1.trim.fastq.gz"
@@ -436,31 +487,31 @@ ROADMAP_META="${ANNOTDIR}/${GENOME}/eid_to_mnemonic.txt"
 
 #python /home/asd2007/ATACseq/run_ataqc.athena.py --workdir $PWD/${Sample} \
 
-python /home/asd2007/ATACseq/run_ataqc.athena.py --workdir $PWD/${Sample} \
-    --outdir qc \
-    --outprefix ${Sample} \
-    --genome hg19 \
-    --ref "${REFDIR}/hg19/encodeHg19Male/encodeHg19Male.fa" \
-    --tss "${REFDIR}/hg19/hg19_RefSeq_stranded.bed.gz" \
-    --dnase "${REFDIR}/hg19/reg2map_honeybadger2_dnase_all_p10_ucsc.bed.gz" \
-    --blacklist "${REFDIR}/hg19/wgEncodeDacMapabilityConsensusExcludable.bed.gz" \
-    --prom "${REFDIR}/hg19/reg2map_honeybadger2_dnase_prom_p2.bed.gz" \
-    --enh "${REFDIR}/hg19/reg2map_honeybadger2_dnase_enh_p2.bed.gz" \
-    --reg2map ${REG2MAP} \
-    --meta ${ROADMAP_META} \
-    --fastq1 ${F1} \
-    --fastq2 ${F2} \
-    --alignedbam ${ALIGNED_BAM} \
-    --alignmentlog "${Sample}/${Sample}.align.log" \
-    --coordsortbam "${Sample}/${Sample}.sorted.bam" \
-    --duplog "${Sample}/${Sample}.dup.qc" \
-    --pbc "${Sample}/${Sample}.pbc.qc" \
-    --finalbam "${FINAL_BAM}" \
-    --finalbed "${FINAL_BED}" \
-    --bigwig "$Sample/$Sample.smooth150.center.extend.fpkm.max150.bw" \
-    --peaks "${Sample}/${Sample}.nodup.tn5.pval0.01.500k.narrowPeak.gz" \
-    --naive_overlap_peaks "${Sample}/pseudo_reps/${Sample}.nodup.tn5.pooled.pf.pval0.1.500K.naive_overlap.narrowPeak.gz" \
-    --idr_peaks "${Sample}/IDR/${Sample}.IDR.txt.IDR0.1.filt.narrowPeak.gz"
+#python /home/asd2007/ATACseq/run_ataqc.athena.py --workdir $PWD/${Sample} \
+#    --outdir qc \
+#    --outprefix ${Sample} \
+#    --genome hg19 \
+#    --ref "${REFDIR}/hg19/encodeHg19Male/encodeHg19Male.fa" \
+#    --tss "${REFDIR}/hg19/hg19_RefSeq_stranded.bed.gz" \
+#    --dnase "${REFDIR}/hg19/reg2map_honeybadger2_dnase_all_p10_ucsc.bed.gz" \
+#    --blacklist "${REFDIR}/hg19/wgEncodeDacMapabilityConsensusExcludable.bed.gz" \
+#    --prom "${REFDIR}/hg19/reg2map_honeybadger2_dnase_prom_p2.bed.gz" \
+#    --enh "${REFDIR}/hg19/reg2map_honeybadger2_dnase_enh_p2.bed.gz" \
+#    --reg2map ${REG2MAP} \
+#    --meta ${ROADMAP_META} \
+#    --fastq1 ${F1} \
+#    --fastq2 ${F2} \
+#    --alignedbam ${ALIGNED_BAM} \
+#    --alignmentlog "${Sample}/${Sample}.align.log" \
+#    --coordsortbam "${Sample}/${Sample}.sorted.bam" \
+#    --duplog "${Sample}/${Sample}.dup.qc" \
+#    --pbc "${Sample}/${Sample}.pbc.qc" \
+#    --finalbam "${FINAL_BAM}" \
+#    --finalbed "${FINAL_BED}" \
+#    --bigwig "$Sample/$Sample.smooth150.center.extend.fpkm.max150.bw" \
+#    --peaks "${Sample}/${Sample}.nodup.tn5.pval0.01.500k.narrowPeak.gz" \
+#    --naive_overlap_peaks "${Sample}/pseudo_reps/${Sample}.nodup.tn5.pooled.pf.pval0.1.500K.naive_overlap.narrowPeak.gz" \
+#    --idr_peaks "${Sample}/IDR/${Sample}.IDR.txt.IDR0.1.filt.narrowPeak.gz"
 
 rsync -r -a -v $TMPDIR/${Sample} $path/${Sample}
 
@@ -510,8 +561,9 @@ fi
 
 
 
+cd $path
 
-
+qsub -t ${SGE_TASK_ID} ~/ATACseq/run_ataqc.athena.sh $PWD 1
 
 
 

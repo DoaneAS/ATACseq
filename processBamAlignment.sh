@@ -51,7 +51,10 @@ fi
 echo "Removing duplicates..."
 out2=$(echo ${out1} | sed 's/\.bam$/.nodup.bam/')
 echo ${out2}
-picard MarkDuplicates INPUT=${out1} OUTPUT=${out2} METRICS_FILE="${out2}.dups.log" REMOVE_DUPLICATES=true VALIDATION_STRINGENCY=LENIENT
+picard MarkDuplicates VERBOSITY=WARNING \
+       INPUT=${out1} OUTPUT=${out2} \
+       METRICS_FILE="${out2}.dups.log" \
+       REMOVE_DUPLICATES=true VALIDATION_STRINGENCY=LENIENT
 #picard MarkDuplicates INPUT=Sample_N1.sorted.bam OUTPUT=Sample_N1.sorted.nodup.bam METRICS_FILE="sample.dups.log" REMOVE_DUPLICATES=true
 # index
 samtools index $out2
@@ -72,32 +75,56 @@ samtools view -F 1804 -b ${out2m} > ${out3}
 samtools index $out3
 
 
+out4=$(echo $out1 | sed 's/\.bam$/.nodup.noM.black.bam/')
+
+rmBlack.sh ${out3}
+samtools index ${out4}
+
+rm ${out2m}
 
 # histogram file
 for w in 1000 500 200
 do
-    picard CollectInsertSizeMetrics I=$out3 O="${out3}.window${w}.hist_data" H="${out3}.window${w}.hist_graph.pdf" W=${w}
+    picard CollectInsertSizeMetrics I=$out4 O="${out4}.window${w}.hist_data" H="${out4}.window${w}.hist_graph.pdf" W=${w}
     done
 
 
 
 ## make bam with marked dups and generate PBC file for QC
+## BELOW for QC only
 
-samtools sort -n $p1 -o ${out1prefix}.nsort.bam
+echo "Namesort ..."
+
+sambamba sort --n --memory-limit 30GB \
+         --nthreads ${NSLOTS} --tmpdir ${TMPDIR} --out ${out1prefix}.nsort.bam $p1
+
+#samtools sort -n $p1 -o ${out1prefix}.nsort.bam
 
 #sambamba sort --memory-limit 30GB \
 #         --nthreads ${NSLOTS} --tmpdir ${TMPDIR} --out ${TMPDIR}/${Sample}/${Sample}.bam ${TMPDIR}/${Sample}/${Sample}.bam
 
 samtools fixmate -r ${out1prefix}.nsort.bam ${out1prefix}.nsort.fixmate.bam
-samtools view -F 1804 -f 2 -u  ${out1prefix}.nsort.fixmate.bam | samtools sort - > ${out1prefix}.filt.srt.bam
+#samtools view -F 1804 -f 2 -u  ${out1prefix}.nsort.fixmate.bam | samtools sort - > ${out1prefix}.filt.srt.bam
 
+samtools view -F 1804 -f 2 -u  ${out1prefix}.nsort.fixmate.bam | sambamba sort --memory-limit 30GB \
+                                                                          --nthreads ${NSLOTS} --tmpdir ${TMPDIR} /dev/stdin --out ${out1prefix}.filt.srt.bam
 
-picard MarkDuplicates INPUT=${out1prefix}.filt.srt.bam OUTPUT=${out1prefix}.dupmark.bam METRICS_FILE=${out1prefix}.dup.qc VALIDATION_STRINGENCY=LENIENT ASSUME_SORTED=true REMOVE_DUPLICATES=false
+#alias picard="java -Xms500m -Xmx5G -jar $PICARD"
 
-samtools sort -n ${out1prefix}.dupmark.bam -o ${out1prefix}.srt.tmp.bam
+picard  MarkDuplicates VERBOSITY=WARNING \
+        INPUT=${out1prefix}.filt.srt.bam OUTPUT=${out1prefix}.dupmark.bam METRICS_FILE=${out1prefix}.dup.qc VALIDATION_STRINGENCY=LENIENT ASSUME_SORTED=true REMOVE_DUPLICATES=false
 
-dupmark_bam="${out1prefix}.srt.tmp.bam" 
+#samtools sort -n ${out1prefix}.dupmark.bam -o ${out1prefix}.srt.tmp.bam
+
+sambamba sort --n --memory-limit 30GB \
+         --nthreads ${NSLOTS} --tmpdir ${TMPDIR} --out ${out1prefix}.srt.tmp.bam  ${out1prefix}.dupmark.bam
+
+dupmark_bam="${out1prefix}.srt.tmp.bam"
 
 PBC_QC="${out1prefix}.pbc.qc"
 
 bedtools bamtobed -bedpe -i $dupmark_bam | awk 'BEGIN{OFS="\t"}{print $1,$2,$4,$6,$9,$10}' | grep -v 'chrM' | sort | uniq -c | awk 'BEGIN{mt=0;m0=0;m1=0;m2=0} ($1==1){m1=m1+1} ($1==2){m2=m2+1} {m0=m0+1} {mt=mt+$1} END{printf "%d\t%d\t%d\t%d\t%f\t%f\t%f\n",mt,m0,m1,m2,m0/mt,m1/m0,m1/m2}' > ${PBC_QC}
+
+rm $dupmark_bam
+
+rm ${out1prefix}.dupmark.bam

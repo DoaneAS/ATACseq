@@ -5,8 +5,8 @@
 #$ -cwd
 #$ -l athena=true
 #$ -M ashley.doane@gmail.com
-#$ -pe smp 2
-#$ -l h_vmem=16G
+#$ -pe smp 4
+#$ -l h_vmem=6G
 #$ -R y
 #$ -o /home/asd2007/joblogs
 
@@ -33,13 +33,16 @@ Sample=${Sample%%.*}
 
 
 
+PICARDROOT="/home/asd2007/Tools/picard/build/libs"
+export $PICARDROOT
 
 cd ${path}
 cd ${Sample}
 
 ATHENA=1
+gtf_path=1
 
-if [ $ATHENA == 1 ]
+if [ $ATHENA = 1 ]
 then
     REFDIR="/athena/elementolab/scratch/asd2007/Reference"
     ANNOTDIR="/athena/elementolab/scratch/asd2007/Reference"
@@ -49,21 +52,18 @@ else
     ANNOTDIR="/zenodotus/dat01/melnick_bcell_scratch/asd2007/Reference"
 fi
 
-if [ $gtf_path == 1 ]
+if [ $gtf_path = 1 ]
 then
     #gtf="/zenodotus/dat02/elemento_lab_scratch/oelab_scratch_scratch007/akv3001/mm10_UCSC_ref.gtf"
 	REF="${REFDIR}/Homo_sapiens/UCSC/hg19/Sequence/BWAIndex"
 	REFbt2="${REFDIR}/Homo_sapiens/UCSC/hg19/Sequence/Bowtie2Index"
   # REFbt="/home/asd20i07/dat02/asd2007/Reference/Homo_sapiens/UCSC/mm10/Sequence/BowtieIndex/genome"
-  BLACK="${REFDIR}/hg19/wgEncodeDacMapabilityConsensusExcludable.bed.gz" \
-  #  BLACK="${REFDIR}/encodeBlack.bed"
-    #BLACK="/athena/elementolab/scratch/asd2007/Reference/hg19/Anshul_Hg19UltraHighSignalArtifactRegions.bed"
-    #chrsz="/athena/elementolab/scratch/asd2007/Reference/hg19.genome.chrom.sizes"
-       #fetchChromSizes hg19 > hg19.chrom.sizes
-    chrsz= $PWD/hg19.chrom.sizes
-    RG="hg19"
-    SPEC="hs"
-    REFGen="/athena/elementolab/scratch/asd2007/bin/bcbio/genomes/Hsapiens/hg19/seq/"
+  BLACK="${REFDIR}/hg19/wgEncodeDacMapabilityConsensusExcludable.bed.gz"
+  chrsz="/athena/elementolab/scratch/asd2007/Reference/hg19.chrom.sizes"
+  cp $chrsz $PWD/hg19.chrom.sizes
+  RG="hg19"
+  SPEC="hs"
+  REFGen="/athena/elementolab/scratch/asd2007/bin/bcbio/genomes/Hsapiens/hg19/seq/"
 fi
 
  #   rm picardmetrics.conf
@@ -73,6 +73,14 @@ fi
 #cp ${Sample}/QCmetrics/filtered/*.EstimateLibraryComplexity.log ${Sample}/${Sample}.picardcomplexity.qc
 
 
+export PICARD="/home/asd2007/Tools/picard/build/libs/picard.jar"
+
+export PATH="/home/asd2007/Tools/picard/build/libs:$PATH"
+
+JAVA_HOME=/home/akv3001/jdk1.8.0_05
+#alias picard="java -jar $PICARD"
+
+alias picard="java -Xms500m -Xmx6G -jar $PICARD"
 
 
 ALIGNED_BAM="${PWD}/${Sample}/${Sample}.bam"
@@ -132,7 +140,8 @@ ROADMAP_META="${ANNOTDIR}/${GENOME}/eid_to_mnemonic.txt"
 
 #python /home/asd2007/ATACseq/run_ataqc.athena.py --workdir $PWD/${Sample} \
 
-python /home/asd2007/ATACseq/run_ataqc.peakMets.py --workdir $PWD/${Sample} \
+
+python /home/asd2007/ATACseq/run_ataqc.athena.py --workdir $PWD/${Sample} \
     --outdir qc \
     --outprefix ${Sample} \
     --genome hg19 \

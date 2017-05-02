@@ -5,53 +5,225 @@
 #$ -cwd
 #$ -l "athena=true"
 #$ -M ashley.doane@gmail.com
-#$ -l h_rt=22:00:00
-#$ -pe smp 4-8
+#$ -l h_rt=42:00:00
+#$ -pe smp 4
 #$ -l h_vmem=5G
 #$ -R y
 #$ -o /home/asd2007/joblogs
 
+## This script runs an SGE array job for chipseq processing and analysis. It takes as input a folder containing a set of folders, one for each sample.  Each sample folder contains a target chipseq fastq.gz and an input fastq.gz that must contain the string "INPUT".
+
+
 BT2=0
 BWA=1
 INPUT_FASTQ=1
-path=$1 #path to all the Sample folders
+FOLDERPATH=$1 #FOLDERPATH to all the Sample folders
 RSA=0
 RSAINPUT=0
-#file=`awk 'NR==n' n=$SGE_TASK_ID INPUTS`
-gtf_path=$2 #Number indicating the reference gtf [1 for Human 2 for Mouse 3 for other]
+#FILEPATH=`awk 'NR==n' n=$SGE_TASK_ID INPUTS`
+#gtf_FOLDERPATH=$2 #Number indicating the reference gtf [1 for Human 2 for Mouse 3 for other]
 #CONT="/home/asd2007/melnick_bcell_scratch/asd2007/Projects/barbieri/PCa/Zhao/sample_SRR2033042_LNCaP_input/sample_SRR2033042_LNCaP_input/sample_SRR2033042_LNCaP_input.sorted.nodup.bam"
 #CONT=$3
 #CONT="/home/asd2007/melnick_bcell_scratch/asd2007/ChipSeq/GCB_PolII/Sample_GCB_INPUT_C/Sample_GCB_INPUT_C/Sample_GCB_INPUT_C.tagAlign.gz"
 
 
 
-#CONT="/home/asd2007/melnick_bcell_scratch/asd2007/ChipSeq/GCB_PolII/Sample_GCB_INPUT_C/Sample_GCB_INPUT_C_picard.bam"
+while [[ $# -gt 1 ]]
+do
+    key="$1"
+
+    case $key in
+        -f|--folder)
+            FOLDERPATH="$2"
+            shift # past argument
+            ;;
+        -g|--genome)
+            GENOME="$2"
+            shift # past argument
+            ;;
+        -t|--trim)
+            TRIM=YES
+            shift # past argument
+            ;;
+        --align)
+            BWA=1
+            ;;
+        *)
+            # unknown option
+            ;;
+    esac
+    shift # past argument or value
+done
+echo FOLDER PATH   = "${FOLDERPATH}"
+echo GENOME     = "${GENOME}"
+echo TRIM READS    = "${TRIM}"
+echo BWA ALN    = "${BWA}"
+if [[ -n $1 ]]; then
+    echo "Last line of FILEPATH specified as non-opt/last argument:"
+    tail -1 $1
+fi
+
+
+BT2LAN=0
+
+#set -e
+
+# detect kernel then source spack FILEPATH if it exists
+
+#if [ -f /pbtech_mounts/softlib001/apps/EL6/spack/share/spack/setup-env.sh ] ; then
+#    . /pbtech_mounts/softlib001/apps/EL6/spack/share/spack/setup-env.sh
+#fi
+
+
+spack load bwa
+spack load bowtie2
+source /softlib/apps/EL6/R-v3.3.0/env
+
+
+
+#if [ -f /home/asd2007/ATACseq/set-env.sh ] ; then
+#     . /home/asd2007/ATACseq/set-env.sh
+
+   
+
+
+#FOLDERPATH=$1 #FOLDERPATH to all the Samples
+#GENOME=$2
+#GENOME="hg38" #Number indicating the reference gtf [1 for Human 2 for Mouse 3 for other]
 
 # Uses job array for each Sample in the folder
-file=$(ls ${path} | tail -n +${SGE_TASK_ID}| head -1)
+FILEPATH=$(ls ${FOLDERPATH} | tail -n +${SGE_TASK_ID}| head -1)
 
 #change directory to node directory
-cd ${TMPDIR}
+cd $TMPDIR
 
-echo "File : $file Read from $path\n"
+echo "File : $FILEPATH Read from $FOLDERPATH\n"
 
 #Obtain the name of the Sample
-Sample=$(basename "$file")
+Sample=$(basename "$FILEPATH")
 Sample=${Sample%%.*}
 
-#Add file checker if fastq or gz
 
-#copy the Samples with .gz extension to the tmp folder
-#rsync -r -v -a -z $path/$file/*.fastq ./
+rsync -r -v -a  $FOLDERPATH/$FILEPATH/*.gz ./
+#rsync -r -v -a -z $FOLDERPATH/$FILEPATH/*.sra ./
+rsync -r -v -a $FOLDERPATH/$FILEPATH/* ./
+#SRA=$(ls *.sra)
 
-#rsync -r -v -a -z $path/$file/*.fastq ./
+mkdir -p ${Sample}
 
-#rsync  -a $path/$file/*.sra ./
-#rsync  -a  $path/$file/*.gz ./
+echo "Processing  $Sample ..."
 
-rsync  -av   $path/$file/ ./
+#Figuring out the reference genome
 
 
+if [[ $ATHENA == 1 ]] ; then
+    REFDIR="/athena/elementolab/scratch/asd2007/reference"
+    ANNOTDIR="/athena/elementolab/scratch/asd2007/reference"
+    PICARDCONF="/home/asd2007/Scripts/picardmetrics.athena.conf"
+    export PATH="/home/asd2007/anaconda2/bin:$PATH"
+else
+    REFDIR="/zenodotus/dat01/melnick_bcell_scratch/asd2007/reference"
+    ANNOTDIR="/zenodotus/dat01/melnick_bcell_scratch/asd2007/reference"
+    PICARDCONF="/home/asd2007/Scripts/picardmetrics.conf"
+fi
+
+# get genome args
+if [[ $GENOME == "hg19" ]] ; then
+    REF="/athena/elementolab/scratch/asd2007/reference/hg19/bwa_index/male.hg19.fa"
+    #REF="${REFDIR}/Homo_sapiens/UCSC/hg19/Sequence/BWAIndex"
+	  REFbt2="${REFDIR}/Homo_sapiens/UCSC/hg19/Sequence/Bowtie2Index"
+    BLACK="/athena/elementolab/scratch/asd2007/reference/hg19/wgEncodeDacMapabilityConsensusExcludable.bed"
+    #BLACK="${REFDIR}/hg19/wgEncodeDacMapabilityConsensusExcludable.bed.gz"
+    #fetchChromSizes hg19 > hg19.chrom.sizes
+    chrsz="/athena/elementolab/scratch/asd2007/reference/hg19.chrom.sizes"
+    cp $chrsz $PWD/hg19.chrom.sizes
+    RG="hg19"
+    SPEC="hs"
+    REFGen="/athena/elementolab/scratch/asd2007/reference/hg19/seq/male.hg19.fa"
+elif [[ $GENOME == "hg38" ]] ; then
+    echo "genome is ${GENOME}"
+    DNASE_BED="${ANNOTDIR}/${GENOME}/ataqc/reg2map_honeybadger2_dnase_all_p10_ucsc.bed.gz"
+    BLACK="/athena/elementolab/scratch/asd2007/reference/hg38/hg38.blacklist.bed.gz"
+    #PROM="${ANNOTDIR}/${GENOME}/reg2map_honeybadger2_dnase_prom_p2.bed.gz"
+    #ENH="${ANNOTDIR}/${GENOME}/reg2map_honeybadger2_dnase_enh_p2.bed.gz"
+    #REG2MAP="${ANNOTDIR}/${GENOME}/dnase_avgs_reg2map_p10_merged_named.pvals.gz"
+    #ROADMAP_META="${ANNOTDIR}/${GENOME}/eid_to_mnemonic.txt"
+	  REF="/athena/elementolab/scratch/asd2007/reference/hg38/bwa_index/GRCh38_no_alt_analysis_set_GCA_000001405.15.fasta"
+	  REFbt2="/athena/elementolab/scratch/asd2007/reference/hg38/bowtie2_index/GRCh38_no_alt_analysis_set_GCA_000001405.15.fasta"
+	  bwt2_idx="/athena/elementolab/scratch/asd2007/reference/hg38/bowtie2_index/GRCh38_no_alt_analysis_set_GCA_000001405.15.fasta"
+    #fetchChromSizes hg19 > hg19.chrom.sizes
+    RG="hg38"
+    SPEC="hs"
+    REFGen="/athena/elementolab/scratch/asd2007/reference/hg38/GRCh38_no_alt_analysis_set_GCA_000001405.15.fasta"
+    chrsz=/athena/elementolab/scratch/asd2007/reference/hg38/hg38.chrom.sizes
+    seq=/athena/elementolab/scratch/asd2007/reference/hg38/seq
+    gensz=hs
+    bwt2_idx=/athena/elementolab/scratch/asd2007/reference/hg38/bowtie2_index/GRCh38_no_alt_analysis_set_GCA_000001405.15.fasta
+    REF_FASTA=/athena/elementolab/scratch/asd2007/reference/hg38/GRCh38_no_alt_analysis_set_GCA_000001405.15.fasta
+    species_browser=hg38
+    # data for ATAQC
+    TSS_ENRICH=/athena/elementolab/scratch/asd2007/reference/hg38/ataqc/hg38_gencode_tss_unique.bed.gz
+    DNASE=/athena/elementolab/scratch/asd2007/reference/hg38/ataqc/reg2map_honeybadger2_dnase_all_p10_ucsc.hg19_to_hg38.bed.gz
+    PROM=/athena/elementolab/scratch/asd2007/reference/hg38/ataqc/reg2map_honeybadger2_dnase_prom_p2.hg19_to_hg38.bed.gz
+    ENH=/athena/elementolab/scratch/asd2007/reference/hg38/ataqc/reg2map_honeybadger2_dnase_enh_p2.hg19_to_hg38.bed.gz
+    REG2MAP=/athena/elementolab/scratch/asd2007/reference/hg38/ataqc/hg38_dnase_avg_fseq_signal_formatted.txt.gz
+    REG2MAP_BED=/athena/elementolab/scratch/asd2007/reference/hg38/ataqc/hg38_celltype_compare_subsample.bed.gz
+    ROADMAP_META=/athena/elementolab/scratch/asd2007/reference/hg38/ataqc/hg38_dnase_avg_fseq_signal_metadata.txt
+elif [[ $GENOME == "hg38_ENCODE" ]]; then
+    DNASE_BED="${ANNOTDIR}/${GENOME}/ataqc/reg2map_honeybadger2_dnase_all_p10_ucsc.bed.gz"
+    BLACK="/athena/elementolab/scratch/asd2007/reference/hg38/hg38.blacklist.bed.gz"
+    #PROM="${ANNOTDIR}/${GENOME}/reg2map_honeybadger2_dnase_prom_p2.bed.gz"
+    #ENH="${ANNOTDIR}/${GENOME}/reg2map_honeybadger2_dnase_enh_p2.bed.gz"
+    #REG2MAP="${ANNOTDIR}/${GENOME}/dnase_avgs_reg2map_p10_merged_named.pvals.gz"
+    #ROADMAP_META="${ANNOTDIR}/${GENOME}/eid_to_mnemonic.txt"
+	  REF="/athena/elementolab/scratch/asd2007/reference/hg38_ENCODE/bwa_index/GRCh38_no_alt_analysis_set_GCA_000001405.15.fasta"
+	  REFbt2="/athena/elementolab/scratch/asd2007/reference/hg38_ENCODE/bowtie2_index/GRCh38_no_alt_analysis_set_GCA_000001405.15.fasta"
+    chrsz="/athena/elementolab/scratch/asd2007/reference/hg38_ENCODE/hg38_ENCODE.chrom.sizes"
+    #fetchChromSizes hg19 > hg19.chrom.sizes
+    RG="hg38"
+    SPEC="hs"
+    REFGen="/athena/elementolab/scratch/asd2007/reference/hg38/GRCh38_no_alt_analysis_set_GCA_000001405.15.fasta"
+    chrsz=/athena/elementolab/scratch/asd2007/reference/hg38_ENCODE/hg38.chrom.sizes
+    seq=/athena/elementolab/scratch/asd2007/reference/hg38_ENCODE/seq
+    gensz=hs
+    bwt2_idx=/athena/elementolab/scratch/asd2007/reference/hg38_ENCODE/bowtie2_index/GRCh38_no_alt_analysis_set_GCA_000001405.15.fasta
+    REF_FASTA=/athena/elementolab/scratch/asd2007/reference/hg38_ENCODE/GRCh38_no_alt_analysis_set_GCA_000001405.15.fasta
+    species_browser=hg38
+    # data for ATAQC
+    TSS_ENRICH=/athena/elementolab/scratch/asd2007/reference/hg38_ENCODE/ataqc/hg38_gencode_tss_unique.bed.gz
+    DNASE=/athena/elementolab/scratch/asd2007/reference/hg38_ENCODE/ataqc/reg2map_honeybadger2_dnase_all_p10_ucsc.hg19_to_hg38.bed.gz
+    PROM=/athena/elementolab/scratch/asd2007/reference/hg38_ENCODE/ataqc/reg2map_honeybadger2_dnase_prom_p2.hg19_to_hg38.bed.gz
+    ENH=/athena/elementolab/scratch/asd2007/reference/hg38_ENCODE/ataqc/reg2map_honeybadger2_dnase_enh_p2.hg19_to_hg38.bed.gz
+    REG2MAP=/athena/elementolab/scratch/asd2007/reference/hg38/ataqc/hg38_ENCODE_dnase_avg_fseq_signal_formatted.txt.gz
+    REG2MAP_BED=/athena/elementolab/scratch/asd2007/reference/hg38_ENCODE/ataqc/hg38_celltype_compare_subsample.bed.gz
+    ROADMAP_META=/athena/elementolab/scratch/asd2007/reference/hg38_ENCODE/ataqc/hg38_dnase_avg_fseq_signal_metadata.txt
+elif [[ $GENOME == "mm10" ]]; then
+    genome=mm10
+	  gtf="/zenodotus/dat02/elemento_lab_scratch/oelab_scratch_scratch007/akv3001/Mus_UCSC_ref.gtf"
+	  REF="/zenodotus/dat02/elemento_lab_scratch/oelab_scratch_scratch007/akv3001/Genomes/Mus_musculus/UCSC/mm10/Sequence/BWAIndex"
+    REFbt2="/zenodotus/dat02/elemento_lab_scratch/oelab_scratch_scratch007/akv3001/Genomes/Mus_musculus/UCSC/mm10/Sequence/Bowtie2Index"
+    BLACK="/athena/elementolab/scratch/asd2007/reference/mm10-blacklist.bed"
+    RG="mm10"
+    SPEC="mm"
+    REFGen="/athena/elementolab/scratch/asd2007/bin/bcbio/genomes/Mmusculus/mm10/seq/"
+    #chrsz="/athena/elementolab/scratch/asd2007/reference/mm10.genome.chrom.sizes"
+    fetchChromSizes mm10 > mm10.chrom.sizes
+    chrsz= $PWD/mm10.chrom.sizes
+    rsync -av /home/asd2007/Scripts/picardmetrics.Mouse.conf ./
+else
+    echo "genome is hg19"
+	  REF="${REFDIR}/Homo_sapiens/UCSC/hg19/Sequence/BWAIndex"
+	  REFbt2="${REFDIR}/Homo_sapiens/UCSC/hg19/Sequence/Bowtie2Index"
+    BLACK="${REFDIR}/hg19/wgEncodeDacMapabilityConsensusExcludable.bed.gz"
+    #fetchChromSizes hg19 > hg19.chrom.sizes
+    chrsz="/athena/elementolab/scratch/asd2007/reference/hg19.chrom.sizes"
+    cp $chrsz $PWD/hg19.chrom.sizes
+    RG="hg19"
+    SPEC="hs"
+    REFGen="/athena/elementolab/scratch/asd2007/local/share/bcbio/genomes/Hsapiens/hg19/seq/hg19.fa"
+fi
+
+# Uses job array for each Sample in the folder
 ##for SRA
 
 echo "making fastq fromm SRA using fastq-dump.."
@@ -61,108 +233,34 @@ echo "making fastq fromm SRA using fastq-dump.."
 
 if [ $RSAINPUT == 1 ]
 then
-    fastq-dump --gzip --skip-technical  --readids --dumpbase --split-files --clip *INPUT*.sra
+    fastq-dump --gzip --skip-technical  --readids --dumpbase --split-FILEPATHs --clip *INPUT*.sra
 fi
 #rm *INPUT*.sra
 
 myd=$(ls -lrth $TMPDIR)
 echo "Dir contains $myd"
-#rsync -r -v -a -z $path/$file/ ./
-#rsync -r -v -a -z $path/$file/ ./
+#rsync -r -v -a -z $FOLDERPATH/$FILEPATH/ ./
+#rsync -r -v -a -z $FOLDERPATH/$FILEPATH/ ./
 
 echo "Processing  $Sample ..."
-
-#Figuring out the Reference genome
-
-
-
-
-
-
-
-
-
-if [ $ATHENA == 1 ]
-then
-    REFDIR="/athena/elementolab/scratch/asd2007/Reference"
-    ANNOTDIR="/athena/elementolab/scratch/asd2007/Reference"
-    PICARDCONF="/home/asd2007/Scripts/picardmetrics.athena.conf"
-else
-    REFDIR="/zenodotus/dat01/melnick_bcell_scratch/asd2007/Reference"
-    ANNOTDIR="/zenodotus/dat01/melnick_bcell_scratch/asd2007/Reference"
-    PICARDCONF="/home/asd2007/Scripts/picardmetrics.conf"
-fi
-
-if [ $gtf_path == 1 ]
-then
-	REF="${REFDIR}/Homo_sapiens/UCSC/hg19/Sequence/BWAIndex"
-	REFbt2="${REFDIR}/Homo_sapiens/UCSC/hg19/Sequence/Bowtie2Index"
-  BLACK="${REFDIR}/hg19/wgEncodeDacMapabilityConsensusExcludable.bed.gz"
-  #fetchChromSizes hg19 > hg19.chrom.sizes
-  chrsz="/athena/elementolab/scratch/asd2007/Reference/hg19.chrom.sizes"
-  cp $chrsz $PWD/hg19.chrom.sizes
-  RG="hg19"
-  SPEC="hs"
-  REFGen="/athena/elementolab/scratch/asd2007/bin/bcbio/genomes/Hsapiens/hg19/seq/"
-elif [ $gtf_path == 2 ]
-then
-	gtf="/zenodotus/dat02/elemento_lab_scratch/oelab_scratch_scratch007/akv3001/Mus_UCSC_ref.gtf"
-	REF="/zenodotus/dat02/elemento_lab_scratch/oelab_scratch_scratch007/akv3001/Genomes/Mus_musculus/UCSC/mm10/Sequence/BWAIndex"
-    REFbt2="/zenodotus/dat02/elemento_lab_scratch/oelab_scratch_scratch007/akv3001/Genomes/Mus_musculus/UCSC/mm10/Sequence/Bowtie2Index"
-    BLACK="/athena/elementolab/scratch/asd2007/Reference/mm10-blacklist.bed"
-    RG="mm10"
-    SPEC="mm"
-    REFGen="/athena/elementolab/scratch/asd2007/bin/bcbio/genomes/Mmusculus/mm10/seq/"
-    #chrsz="/athena/elementolab/scratch/asd2007/Reference/mm10.genome.chrom.sizes"
-    fetchChromSizes mm10 > mm10.chrom.sizes
-    chrsz= $PWD/mm10.chrom.sizes
-    rsync -av /home/asd2007/Scripts/picardmetrics.Mouse.conf ./
-else
-	gtf="/zenodotus/dat02/elemento_lab_scratch/oelab_scratch_scratch007/akv3001/mm10_UCSC_ref.gtf"
-	REF="/zenodotus/dat02/elemento_lab_scratch/oelab_scratch_scratch007/akv3001/Genomes/Homo_sapiens/UCSC/mm10/Sequence/BWAIndex/genome.fa"
-fi
-
-
-
-#rsync -a ${REF} ${TMPDIR}/
-
-#rsync -a ${REFbt2} ${TMPDIR}/
-
 mkdir ${TMPDIR}/${Sample}
 
 echo "ls of pwd is"
-ls -lrth
-
 ls -lrth $TMPDIR
-
-#rsync -avP /zenodotus/dat02/elemento_lab_scratch/oelab_scratch_scratch007/asd2007/Reference/bwaidx/genome.fa* ref
-
-#rsync -avP /zenodotus/dat02/elemento_lab_scratch/oelab_scratch_scratch007/akv3001/Genomes/Homo_sapiens/UCSC/hg19/Sequence/BWAIndex/genome
- #rsync -avP /zenodotus/dat02/elemento_lab_scratch/oelab_scratch_scratch007/akv3001/Genomes/Homo_sapiens/UCSC/hg19/Sequence/BWAIndex/ ref
-#REF="$TMPDIR/ref/genome.fa"
-
 mkdir R1
 
-
-
-#mv *_1.fastq R1/
-#mv *_2.fastq R2/
-
-
-
 #count=$(ls -l R1/ |wc -l)
-echo "----------bt2 aligning-------------"
-#Use bwa mem to align each pair in data set
-
 
 ReadGroup="$( echo '@RG'"\tID:${Sample}\tLB:${Sample}\tPL:illumina\tSM:${Sample}\tPU:${Sample}")"
 if [ $INPUT_FASTQ == 1 ]
 then
+    echo "----------bwa aligning INPUT-------------"
+    #Use bwa mem to align each pair in data set
     mkdir -p $TMPDIR/INPUT
     cat ${TMPDIR}/*INPUT*.fastq.gz > ${TMPDIR}/INPUT/${Sample}.INPUT.fastq.gz
+    #rm input from wd leaving only target
     rm ${TMPDIR}/*INPUT*.fastq.gz
-    bwa mem -t ${NSLOTS} ${REF}*.fa $TMPDIR/INPUT/${Sample}.INPUT.fastq.gz | samtools view -bS - > $TMPDIR/${Sample}/${Sample}.INPUT.bam
-   
+    bwa mem -t ${NSLOTS} ${REF} $TMPDIR/INPUT/${Sample}.INPUT.fastq.gz | samtools view -bS - > $TMPDIR/${Sample}/${Sample}.INPUT.bam
     sambamba sort --memory-limit 35GB \
              --nthreads ${NSLOTS} --tmpdir ${TMPDIR} --out $TMPDIR/${Sample}/${Sample}.INPUT.sorted.bam $TMPDIR/${Sample}/${Sample}.INPUT.bam
     samtools index $TMPDIR/${Sample}/${Sample}.INPUT.sorted.bam
@@ -182,7 +280,7 @@ echo "----- FINISHED PROCESSING INPUT------"
 
 if [ $RSA == 1 ]
 then
-    fastq-dump --gzip --skip-technical  --readids --dumpbase --split-files --clip *.sra
+    fastq-dump --gzip --skip-technical  --readids --dumpbase --split-FILEPATHs --clip *.sra
 fi
 
 cat $TMPDIR/*.fastq.gz > $TMPDIR/R1/${Sample}.fastq.gz
@@ -206,7 +304,7 @@ fi
 
 if [ $BWA == 1 ]
 then
-        bwa mem -t ${NSLOTS} ${REF}*.fa $TMPDIR/R1/${Sample}.fastq.gz | \
+        bwa mem -t ${NSLOTS} ${REF} $TMPDIR/R1/${Sample}.fastq.gz | \
         samtools view -bS - > $TMPDIR/${Sample}/${Sample}.bam
     sambamba sort --memory-limit 35GB \
              --nthreads ${NSLOTS} --tmpdir ${TMPDIR} --out $TMPDIR/${Sample}/${Sample}.sorted.bam $TMPDIR/${Sample}/${Sample}.bam
@@ -234,31 +332,19 @@ samtools index $TMPDIR/${Sample}/${Sample}.sorted.nodup.bam
 #    ASSUME_SORTED=true REMOVE_DUPLICATES=true TMP_DIR=${TMPDIR}/tmp
 
 
-#rsync -r -v $TMPDIR/${Sample} $path/${Sample}
+#rsync -r -v $TMPDIR/${Sample} $FOLDERPATH/${Sample}
 
 
 
 echo "--------------------------Removing encode black listed intervals---------------------------"
 
-rmBlack.sh $CONT
-
-
+rmBlack.sh $CONT $BLACK
 CONT=$TMPDIR/${Sample}/${Sample}*INPUT*black.bam
 
-
-rmBlack.sh $TMPDIR/${Sample}/${Sample}.sorted.nodup.bam
-
-
-#bedtools subtract -A -a $TMPDIR/${Sample}/${Sample}.sorted.nodup.bam -b $BLACK > $TMPDIR/${Sample}/${Sample}.sorted.nodup.black.bam
-
-#samtools index $TMPDIR/${Sample}/${Sample}.sorted.nodup.black.bam
+rmBlack.sh $TMPDIR/${Sample}/${Sample}.sorted.nodup.bam $BLACK
 
 
-
-#/home/ole2001/PROGRAMS/SOFT/bedtools2/bin/bamToBed -i $TMPDIR/${Sample}/${Sample}.sorted.nodup.black.bam  > $TMPDIR/${Sample}/${Sample}.sorted.nodup.black.bed
-
-
-#rsync -a -r $TMPDIR/${Sample} $path/${Sample}
+#rsync -a -r $TMPDIR/${Sample} $FOLDERPATH/${Sample}
 
 
 echo "------------------------------------------Call Peaks with MACS2--------------------------------------------"
@@ -303,7 +389,6 @@ macs2 callpeak -t $TMPDIR/${Sample}/${Sample}.tagAlign.gz -c $TMPDIR/Input.tagAl
 
 
 
-rsync -r -a  $TMPDIR/${Sample} $path/${Sample}/
 
 
 cp /athena/elementolab/scratch/asd2007/Reference/hg19.chrom.sizes ./
@@ -341,13 +426,12 @@ rm ${prefix}*.bedgraph
 
 #rm ${p1}_FE.bdg ${p1}_treat_pileup.bdg ${p1}_control_lambda.bdg
 
-# Create bigwig file
+# Create bigwig FILEPATH
 sort -k8nr,8nr ${prefix}_peaks.narrowPeak | gzip -c > ${prefix}.peaks.bed.gz
 #rm ${p1}_peaks.encodePeak
 zcat ${prefix}.peaks.bed.gz | awk 'BEGIN{OFS="\t"}{print $1,$2,$3,$8}' > ${prefix}.4col.peaks.bed
 
 
-rsync -r -a $TMPDIR/${Sample} $path/${Sample}/
 
 
 
@@ -373,8 +457,17 @@ bamCoverage --bam $TMPDIR/${Sample}/${Sample}.sorted.nodup.bam --binSize 5 \
 
 
 
+## cleanup
 
-rsync -a -r $TMPDIR/${Sample} $path/${Sample}/
+if [ -f "${Sample}.sorted.nodup.black.bam"] ; then
+    rm *.sorted.bam
+    rm *.sorted.nodup.bam
+fi
+
+
+
+
+rsync -a -r $TMPDIR/${Sample} $FOLDERPATH/${Sample}/
 #
 #
 #

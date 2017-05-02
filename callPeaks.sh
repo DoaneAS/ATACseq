@@ -10,7 +10,7 @@ FINAL_BEDPE_FILE=$1
 SAMPLE=$2
 SPEC=$3
 
-chrsz="/home/asd2007/melnick_bcell_scratch/asd2007/Reference/hg19.genome.chrom.sizes"
+chrsz="/athena/elementolab/scratch/asd2007/Reference/hg19.chrom.sizes"
 # Get total number of read pairs
 nlines=$( zcat ${FINAL_BEDPE_FILE} | wc -l  )
 nlines=$(( (nlines + 1) / 2  ))

@@ -3,7 +3,7 @@
 # read from command line the unfiltered and unsortde bam file
 
 p1=$1
-
+BLACK=$2
 
 #BLACK="/home/asd2007/melnick_bcell_scratch/asd2007/Reference/encodeBlack.bed"
 # help
@@ -77,7 +77,7 @@ samtools index $out3
 
 out4=$(echo $out1 | sed 's/\.bam$/.nodup.noM.black.bam/')
 
-rmBlack.sh ${out3}
+rmBlack.sh ${out3} ${BLACK}
 samtools index ${out4}
 
 rm ${out2m}
@@ -86,7 +86,7 @@ rm ${out2m}
 for w in 1000 500 200
 do
     picard CollectInsertSizeMetrics I=$out4 O="${out4}.window${w}.hist_data" H="${out4}.window${w}.hist_graph.pdf" W=${w}
-    done
+done
 
 
 

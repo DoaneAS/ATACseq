@@ -1,6 +1,6 @@
 
 
-#source activate bds_atac_py3
+source activate bds_atac_py3
 
 
 

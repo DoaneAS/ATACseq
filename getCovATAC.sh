@@ -37,7 +37,7 @@ Sample=${Sample%%.*}
 
 rsync  -v -a  $path/$file/${Sample}/*.sorted.nodup.noM.bam ./
 
-rmBlack.sh ${Sample}.sorted.nodup.noM.bam 
+#rmBlack.sh ${Sample}.sorted.nodup.noM.bam 
 
 #rsync -r -v -a -z $path/$file ./
 
@@ -102,13 +102,14 @@ echo "----------counting Tn5 insertions -------------"
 #BED="/athena/elementolab/scratch/asd2007/Projects/DataSets/atacData/atacLY7/WTidr.IDR0.1.filt.narrowPeak"
 #BED="/athena/elementolab/scratch/asd2007/Projects/HOMER/Homer.input/LY7idr.atlas.peakSummits300.bed"
 
-BED="/athena/elementolab/scratch/asd2007/Projects/HOMER/Homer.input/LY7idr.atlas.peakSummits300reduced.bed"
+#BED="/athena/elementolab/scratch/asd2007/Projects/HOMER/Homer.input/LY7idr.atlas.peakSummits300reduced.bed"
 
+BED="/athena/elementolab/scratch/asd2007/Projects/HOMER/Homer.input/BCellAtlas.bed"
 
 pyatac counts --bam ${TMPDIR}/${Sample}.sorted.nodup.noM.black.bam --bed ${BED} --out ${Sample}.ins
 #bedtools multicov -split -bams $BAMS -bed $BED
 
-rsync -a -v $TMPDIR/${Sample}* /athena/elementolab/scratch/asd2007/Projects/DataSets/atacData/atacLY7/bams/
+#rsync -a -v $TMPDIR/${Sample}* /athena/elementolab/scratch/asd2007/Projects/DataSets/atacData/atacLY7/bams/
 
 LIBS=$(zcat ${Sample}.ins.counts.txt.gz  | awk '{sum +=$1} END  {printf sum}')
 

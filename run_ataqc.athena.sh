@@ -6,7 +6,7 @@
 #$ -l athena=true
 #$ -M ashley.doane@gmail.com
 #$ -pe smp 4
-#$ -l h_vmem=6G
+#$ -l h_vmem=4G
 #$ -R y
 #$ -o /home/asd2007/joblogs
 
@@ -50,6 +50,8 @@ if [[ -n $1 ]]; then
 fi
 #cd /athena/elementolab/scratch/asd2007/Projects/DataSets/atacData/atacGiorgio
 
+source activate bds_atac
+
 FILEPATH=$(ls ${FOLDERPATH} | tail -n +${SGE_TASK_ID}| head -1)
 
 #change directory to node directory
@@ -61,8 +63,6 @@ cd "$FILEPATH"
 echo "File : $FILEPATH Read from $FOLDERPATH\n"
 
 #Obtain the name of the Sample
-Sample=$(basename "$FILEPATH")
-Sample=${Sample%%.*}
 #file=$PWD #path to all the Samples
 
 # Uses job array for each Sample in the folder
@@ -75,11 +75,10 @@ Sample=${Sample%%.*}
 echo "QC for $file"
 
 #Obtain the name of the Sample
-Sample=$(basename "$file")
+Sample=$(basename "$FILEPATH")
 Sample=${Sample%%.*}
 
 
-#source activate bds_atac
 
 export PICARDROOT=/home/asd2007/Tools/picard/build/libs
 
@@ -238,7 +237,7 @@ INPREFIX=$Sample
 export PICARD="/home/asd2007/Tools/picard/build/libs/picard.jar"
 export PATH="/home/asd2007/Tools/picard/build/libs:$PATH"
 #JAVA_HOME=/home/akv3001/jdk1.8.0_05
-alias picard="java -Xms500m -Xmx6G -jar $PICARD"
+alias picard="java -Xms500m -Xmx4G -jar $PICARD"
 
 
 if [ -f ${Sample}/${Sample}.picardcomplexity.qc ]; then
@@ -253,7 +252,7 @@ fi;
 
 PEAKS="${Sample}/peaks/*tag.broad_peaks.broadPeak"
 
-getFrip.sh "${FINAL_BAM}" "${PEAKS}" 
+#getFrip.sh "${FINAL_BAM}" "${PEAKS}" 
 
 
 #python /home/asd2007/ATACseq/run_ataqc.athena.py --workdir $PWD/${Sample} \
@@ -262,7 +261,7 @@ python /home/asd2007/ATACseq/run_ataqc.athena.py --workdir $PWD/${Sample} \
     --outdir qc \
     --outprefix ${Sample} \
     --genome ${GENOME} \
-    --ref ${REF_FA} --tss $TSS_ENRICH \
+    --ref ${REF} --tss $TSS_ENRICH \
     --dnase ${DNASE} \
     --blacklist ${BLACK} \
     --prom $PROM \
@@ -281,7 +280,8 @@ python /home/asd2007/ATACseq/run_ataqc.athena.py --workdir $PWD/${Sample} \
    --bigwig "$Sample/$Sample.smooth150.center.extend.fpkm.max150.bw" \
    --peaks "${Sample}/peaks/${Sample}.tn5.pf.narrowPeak.gz" \
    --naive_overlap_peaks "${Sample}/pseudo_reps/${Sample}.nodup.tn5.pooled.pf.pval0.1.500K.naive_overlap.narrowPeak.gz" \
-   --idr_peaks "${Sample}/IDR/${Sample}.IDR.txt.IDR0.1.filt.narrowPeak.gz"
+   --idr_peaks "${Sample}/IDR/${Sample}.IDR.txt.IDR0.1.filt.narrowPeak.gz" \
+   --processes 4
 
 
 

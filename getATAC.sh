@@ -7,16 +7,17 @@
 #$ -l athena=true
 #$ -M ashley.doane@gmail.com
 #$ -l h_rt=48:00:00
-#$ -pe smp 4-8
+#$ -pe smp 4-12
 #$ -l h_vmem=6G
 #$ -R y
 #$ -o /home/asd2007/joblogs
 
-########### SETTINGS ###########
+########### SET DEFAULTS ###########
 TRIM="YES" # 
 NUC=0 # run nucleoatac, extended runtime required
-BT2ALN="YES" # bt2 recommnded!
+ALN="bwa" 
 ATHENA=1
+GENOME="hg38"
 ##############################
 
 while [[ $# -gt 1 ]]
@@ -36,8 +37,9 @@ do
             TRIM="$2"
             shift # past argument
             ;;
-        --align)
-            BT2ALN=YES
+        -a|--aligner)
+            ALN="$2"
+            shift
             ;;
         *)
             # unknown option
@@ -48,14 +50,11 @@ done
 echo FOLDER PATH   = "${FOLDERPATH}"
 echo GENOME     = "${GENOME}"
 echo TRIM READS    = "${TRIM}"
-echo BT2 ALN    = "${BT2ALN}"
+echo ALINGER    = "${ALN}"
 if [[ -n $1 ]]; then
     echo "Last line of FILEPATH specified as non-opt/last argument:"
     tail -1 $1
 fi
-
-
-BT2LAN=YES
 
 #set -e
 
@@ -65,7 +64,7 @@ BT2LAN=YES
 #    . /pbtech_mounts/softlib001/apps/EL6/spack/share/spack/setup-env.sh
 #fi
 
-
+spack load pigz
 spack load bwa
 spack load bowtie2
 source /softlib/apps/EL6/R-v3.3.0/env
@@ -100,6 +99,8 @@ rsync -r -v -a  $FOLDERPATH/$FILEPATH/*.gz ./
 rsync -r -v -a $FOLDERPATH/$FILEPATH/* ./
 #SRA=$(ls *.sra)
 
+#fastq-dump --gzip --skip-technical  --readids --dumpbase --split-files --clip *.sra
+
 mkdir -p ${Sample}
 
 #pigz -p $NSLOTS -c *.R1.trim.fastq > $TMPDIR/${Sample}.R1.trim.fastq.gz
@@ -123,18 +124,29 @@ else
     ANNOTDIR="/zenodotus/dat01/melnick_bcell_scratch/asd2007/reference"
     PICARDCONF="/home/asd2007/Scripts/picardmetrics.conf"
 fi
-
 # get genome args
 if [[ $GENOME == "hg19" ]] ; then
-	  REF="${REFDIR}/Homo_sapiens/UCSC/hg19/Sequence/BWAIndex"
-	  REFbt2="${REFDIR}/Homo_sapiens/UCSC/hg19/Sequence/Bowtie2Index"
-    BLACK="${REFDIR}/hg19/wgEncodeDacMapabilityConsensusExcludable.bed.gz"
-    #fetchChromSizes hg19 > hg19.chrom.sizes
-    chrsz="/athena/elementolab/scratch/asd2007/reference/hg19.chrom.sizes"
-    cp $chrsz $PWD/hg19.chrom.sizes
+    chrsz="/athena/elementolab/scratch/asd2007/reference/hg19/hg19.chrom.sizes"
+    seq="/athena/elementolab/scratch/asd2007/reference/hg19/seq"
+    gensz=hs
+    PICARDCONF="/athena/elementolab/scratch/asd2007/reference/hg19/picardmetrics.conf"
+    SPEC="hs"
+    umap="/athena/elementolab/scratch/asd2007/reference/hg19/globalmap_k20tok54"
+    REF="/athena/elementolab/scratch/asd2007/reference/hg19/bwa_index/male.hg19.fa"
+    BWA_IDX="/athena/elementolab/scratch/asd2007/reference/hg19/bwa_index/male.hg19.fa"
+    REF_FA="/athena/elementolab/scratch/asd2007/reference/hg19/seq/male.hg19.fa"
+    BLACK="/athena/elementolab/scratch/asd2007/reference/hg19/wgEncodeDacMapabilityConsensusExcludable.bed"
+    # data for ATAQC
+    TSS_ENRICH="/athena/elementolab/scratch/asd2007/reference/hg19/ataqc/hg19_gencode_tss_unique.bed.gz"
+    DNASE="/athena/elementolab/scratch/asd2007/reference/hg19/ataqc/reg2map_honeybadger2_dnase_all_p10_ucsc.bed.gz"
     RG="hg19"
     SPEC="hs"
-    REFGen="/athena/elementolab/scratch/asd2007/local/share/bcbio/genomes/Hsapiens/hg19/seq/hg19.fa"
+    PROM="/athena/elementolab/scratch/asd2007/reference/hg19/ataqc/reg2map_honeybadger2_dnase_prom_p2.bed.gz"
+    ENH="/athena/elementolab/scratch/asd2007/reference/hg19/ataqc/reg2map_honeybadger2_dnase_enh_p2.bed.gz"
+    REG2MAP="/athena/elementolab/scratch/asd2007/reference/hg19/ataqc/dnase_avgs_reg2map_p10_merged_named.pvals.gz"
+    ROADMAP_META="/athena/elementolab/scratch/asd2007/reference/hg19/ataqc/eid_to_mnemonic.txt"
+    REFGen="/athena/elementolab/scratch/asd2007/reference/hg19/male.hg19.fa"
+    #REFGen="/athena/elementolab/scratch/asd2007/local/share/bcbio/genomes/Hsapiens/hg19/seq/hg19.fa"
 elif [[ $GENOME == "hg38" ]] ; then
     echo "genome is ${GENOME}"
     DNASE_BED="${ANNOTDIR}/${GENOME}/ataqc/reg2map_honeybadger2_dnase_all_p10_ucsc.bed.gz"
@@ -195,17 +207,30 @@ elif [[ $GENOME == "hg38_ENCODE" ]]; then
     ROADMAP_META=/athena/elementolab/scratch/asd2007/reference/hg38_ENCODE/ataqc/hg38_dnase_avg_fseq_signal_metadata.txt
 elif [[ $GENOME == "mm10" ]]; then
     genome=mm10
-	  gtf="/zenodotus/dat02/elemento_lab_scratch/oelab_scratch_scratch007/akv3001/Mus_UCSC_ref.gtf"
-	  REF="/zenodotus/dat02/elemento_lab_scratch/oelab_scratch_scratch007/akv3001/Genomes/Mus_musculus/UCSC/mm10/Sequence/BWAIndex"
-    REFbt2="/zenodotus/dat02/elemento_lab_scratch/oelab_scratch_scratch007/akv3001/Genomes/Mus_musculus/UCSC/mm10/Sequence/Bowtie2Index"
-    BLACK="/athena/elementolab/scratch/asd2007/reference/mm10-blacklist.bed"
+	  #igtf="/zenodotus/dat02/elemento_lab_scratch/oelab_scratch_scratch007/akv3001/Mus_UCSC_ref.gtf"
+	  #REF="/zenodotus/dat02/elemento_lab_scratch/oelab_scratch_scratch007/akv3001/Genomes/Mus_musculus/UCSC/mm10/Sequence/BWAIndex"
+    #REFbt2="/zenodotus/dat02/elemento_lab_scratch/oelab_scratch_scratch007/akv3001/Genomes/Mus_musculus/UCSC/mm10/Sequence/Bowtie2Index"
+    #BLACK="/athena/elementolab/scratch/asd2007/reference/mm10-blacklist.bed"
     RG="mm10"
     SPEC="mm"
     REFGen="/athena/elementolab/scratch/asd2007/bin/bcbio/genomes/Mmusculus/mm10/seq/"
-    #chrsz="/athena/elementolab/scratch/asd2007/reference/mm10.genome.chrom.sizes"
-    fetchChromSizes mm10 > mm10.chrom.sizes
-    chrsz= $PWD/mm10.chrom.sizes
     rsync -av /home/asd2007/Scripts/picardmetrics.Mouse.conf ./
+    chrsz="/athena/elementolab/scratch/asd2007/reference/mm10/mm10.chrom.sizes"
+    seq="/athena/elementolab/scratch/asd2007/reference/mm10/seq"
+    gensz="mm"
+    bwt2_idx="/athena/elementolab/scratch/asd2007/reference/mm10/bowtie2_index/mm10_no_alt_analysis_set_ENCODE.fasta"
+    REF="/athena/elementolab/scratch/asd2007/reference/mm10/bwa_index/mm10_no_alt_analysis_set_ENCODE.fasta"
+    ref_fa="/athena/elementolab/scratch/asd2007/reference/mm10/mm10_no_alt_analysis_set_ENCODE.fasta"
+    BLACK="/athena/elementolab/scratch/asd2007/reference/mm10/mm10.blacklist.bed.gz"
+    species_browser="mm10"
+# data for ATAQC
+    TSS_ENRICH="/athena/elementolab/scratch/asd2007/reference/mm10/ataqc/mm10_gencode_tss_unique.bed.gz"
+    DNASE="/athena/elementolab/scratch/asd2007/reference/mm10/ataqc/mm10_univ_dhs_ucsc.bed.gz"
+    PROM="/athena/elementolab/scratch/asd2007/reference/mm10/ataqc/tss_mm10_master.bed.gz"
+    ENH="/athena/elementolab/scratch/asd2007/reference/mm10/ataqc/mm10_enh_dhs_ucsc.bed.gz"
+    REG2MAP="/athena/elementolab/scratch/asd2007/reference/mm10/ataqc/mm10_dnase_avg_fseq_signal_formatted.txt.gz"
+    REG2MAP_BED="/athena/elementolab/scratch/asd2007/reference/mm10/ataqc/mm10_celltype_compare_subsample.bed.gz"
+    ROADMAP_META=="/athena/elementolab/scratch/asd2007/reference/mm10/ataqc/mm10_dnase_avg_fseq_signal_metadata.txt"
 else
     echo "genome is hg19"
 	  REF="${REFDIR}/Homo_sapiens/UCSC/hg19/Sequence/BWAIndex"
@@ -236,18 +261,20 @@ ls -lrth
 #cat *R1.trim.fastq > ${Sample}.R1.trim.fastq
 #cat *R2.trim.fastq > ${Sample}.R2.trim.fastq
 
-if [ -f "${TMPDIR}/${Sample}.R1.trim.fastq.gz" ];
-then
-    TRIM=NO
-else
-    TRIM=YES
-fi
+#if [ -f "${TMPDIR}/${Sample}.R1.trim.fastq.gz" ];
+#then
+#    TRIM=NO
+#else
+#    TRIM=YES
+#fi
 
 
+spack load pigz
+spack load bedtools2
 
 if [[ $TRIM == YES ]]; then
     echo "Trimming adapter sequences, with command..."
-    #find *_L00*_R1_001.fastq.gz | sed 's/_R1_001.fastq.gz$//' |parallel -j ${NSLOTS} 'trimAdapters.py -a {}_R1_001.fastq.gz -b {}_R2_001.fastq.gz'
+    echo "find *_L00*_R1_001.fastq.gz | sed 's/_R1_001.fastq.gz$//' |parallel -j ${NSLOTS} 'trimAdapters.py -a {}_R1_001.fastq.gz -b {}_R2_001.fastq.gz'"
     find *_R1_001.fastq.gz | sed 's/_R1_001.fastq.gz$//' |parallel -j ${NSLOTS} 'trimAdapters.py -a {}_R1_001.fastq.gz -b {}_R2_001.fastq.gz'
     cat *_R1_001.trim.fastq > ${Sample}.R1.trim.fastq
     cat *_R2_001.trim.fastq > ${Sample}.R2.trim.fastq
@@ -259,8 +286,8 @@ if [[ $TRIM == YES ]]; then
 else
     echo "will not perform adapter sequence trimming of reads"
     #gunzip *.gz
-      #cat *R1.trim.fastq.gz >  $TMPDIR/${Sample}.R1.trim.fastq.gz
-      #cat *R2.trim.fastq.gz > $TMPDIR/${Sample}.R2.trim.fastq.gz
+      cat *R1.trim.fastq.gz >  $TMPDIR/${Sample}.R1.trim.fastq.gz
+      cat *R2.trim.fastq.gz > $TMPDIR/${Sample}.R2.trim.fastq.gz
       #mkdir R1
       #mkdir R2
       #cat ${Sample}.R1.trim.fastq.gz >  $TMPDIR/${Sample}.R1.trim.fastq.gz
@@ -270,9 +297,9 @@ else
 fi
 
 
-
-
-if [[ $BT2ALN == YES ]] ; then
+spack load bwa
+#
+if [[ $ALN == bt2 ]] ; then
     echo "----------bowtie2 aligning-------------"
     bowtie2 -X 2000 --threads ${NSLOTS} -x ${bwt2_idx}  \
            -1 $TMPDIR/${Sample}.R1.trim.fastq.gz -2 $TMPDIR/${Sample}.R2.trim.fastq.gz 2> ${Sample}/${Sample}.align.log | samtools view -bS - > $TMPDIR/${Sample}/${Sample}.bam
@@ -280,7 +307,7 @@ if [[ $BT2ALN == YES ]] ; then
 else
     echo "----------bwa-mem aligning-------------"
     # echo "aligning : $TMPDIR/${Sample}.R1.trim.fq ,  $TMPDIR/${Sample}.R2.trim.fq using bwa-mem.."
-   # bwa mem -t ${NSLOTS} -M ${REF} $TMPDIR/${Sample}.R1.trim.fastq.gz $TMPDIR/${Sample}.R2.trim.fastq.gz | samtools view -bS - >  $TMPDIR/${Sample}/${Sample}.bam
+    bwa mem -t ${NSLOTS} -M ${REF} $TMPDIR/${Sample}.R1.trim.fastq.gz $TMPDIR/${Sample}.R2.trim.fastq.gz | samtools view -bS - >  $TMPDIR/${Sample}/${Sample}.bam
 fi
 
 ##bwa mem -t ${NSLOTS} -M ${REF} $TMPDIR/${Sample}.R1.trim.fastq.gz $TMPDIR/${Sample}.R2.trim.fastq.gz | samtools view -bS - >  $TMPDIR/${Sample}/${Sample}.bam
@@ -294,7 +321,7 @@ rsync -a -v $TMPDIR/${Sample} $FOLDERPATH/${Sample}
 
 processBamAlignment.sh $TMPDIR/${Sample}/${Sample}.bam ${BLACK}
 
-sambamba sort --memory-limit 30GB -n \
+sambamba sort --memory-limit 20GB -n \
          -t ${NSLOTS} --out $TMPDIR/${Sample}/${Sample}.nsorted.nodup.noM.bam $TMPDIR/${Sample}/${Sample}.sorted.nodup.noM.black.bam
 
 # ALL bams below have blackList regions removed
@@ -345,7 +372,7 @@ cp $TMPDIR/${Sample}/${Sample}.tn5*Peak.gz  $TMPDIR/${Sample}/peaks/
 
 
 
-getFrip.sh ${TMPDIR}/${Sample}/${Sample}.sorted.nodup.noM.black.bam $TMPDIR/${Sample}/${Sample}.tag.broad_peaks.broadPeak
+#getFrip.sh ${TMPDIR}/${Sample}/${Sample}.sorted.nodup.noM.black.bam $TMPDIR/${Sample}/${Sample}.tag.broad_peaks.broadPeak
 
 
 
@@ -462,15 +489,15 @@ rsync -r -a -v $TMPDIR/${Sample} $FOLDERPATH/${Sample}
 #    --centerReads --extendReads
 
 
-let KM=50000 #1 million * bin size in kb
-let LIBZ=$LIBS/$KM#
+#let KM=50000 #1 million * bin size in kb
+#let LIBZ=$LIBS/$KM#
 
-bamCoverage --bam ${TMPDIR}/${Sample}/${Sample}.sorted.nodup.noM.bam --binSize 5 \
-   --outFileFormat bigwig --smoothLength 150  \
-   --scaleFactor $LIBZ \
-    -o ${TMPDIR}/$Sample/$Sample.readsInPeaks.bin5.centered.smooth.150.max200.bw --numberOfProcessors ${NSLOTS} \
-    --maxFragmentLength 150 \
-    --centerReads --extendReads
+#bamCoverage --bam ${TMPDIR}/${Sample}/${Sample}.sorted.nodup.noM.bam --binSize 5 \
+#   --outFileFormat bigwig --smoothLength 150  \
+#   --scaleFactor $LIBZ \
+#    -o ${TMPDIR}/$Sample/$Sample.readsInPeaks.bin5.centered.smooth.150.max200.bw --numberOfProcessors ${NSLOTS} \
+#    --maxFragmentLength 150 \
+#    --centerReads --extendReads
 
 
 #bamCoverage --bam ${TMPDIR}/$Sample/${Sample}.sorted.nodup.noM.bam --binSize 5 \
@@ -491,7 +518,7 @@ rsync -r -a -v $TMPDIR/${Sample} $FOLDERPATH/${Sample}
 
 #rsync -r -a -v $TMPDIR/${Sample}/*.bw  /athena/elementolab/scratch/asd2007/Projects/DataSets/COVERAGE/AWS.OE/${Sample}
 
-sambamba sort --nthreads --memory-limit 30GB \
+sambamba sort --memory-limit 20GB \
          --nthreads ${NSLOTS} --tmpdir ${TMPDIR} --out ${TMPDIR}/${Sample}/${Sample}.sorted.bam ${TMPDIR}/${Sample}/${Sample}.bam
 
 samtools index $TMPDIR/${Sample}/${Sample}.sorted.bam 

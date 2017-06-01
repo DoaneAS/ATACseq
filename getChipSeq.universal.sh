@@ -5,35 +5,34 @@
 #$ -cwd
 #$ -l "athena=true"
 #$ -M ashley.doane@gmail.com
-#$ -l h_rt=42:00:00
-#$ -pe smp 4
+#$ -l h_rt=24:00:00
+#$ -pe smp 4-8
 #$ -l h_vmem=5G
 #$ -R y
 #$ -o /home/asd2007/joblogs
 
 ## This script runs an SGE array job for chipseq processing and analysis. It takes as input a folder containing a set of folders, one for each sample.  Each sample folder contains a target chipseq fastq.gz and an input fastq.gz that must contain the string "INPUT".
 
+########### SET DEFAULTS ###########
+TRIM="YES" # 
+NUC=0 # run nucleoatac, extended runtime required
+ALN="bwa" 
+ATHENA=1
+GENOME="hg38"
+##############################
 
 BT2=0
 BWA=1
 INPUT_FASTQ=1
-FOLDERPATH=$1 #FOLDERPATH to all the Sample folders
 RSA=0
 RSAINPUT=0
-#FILEPATH=`awk 'NR==n' n=$SGE_TASK_ID INPUTS`
-#gtf_FOLDERPATH=$2 #Number indicating the reference gtf [1 for Human 2 for Mouse 3 for other]
-#CONT="/home/asd2007/melnick_bcell_scratch/asd2007/Projects/barbieri/PCa/Zhao/sample_SRR2033042_LNCaP_input/sample_SRR2033042_LNCaP_input/sample_SRR2033042_LNCaP_input.sorted.nodup.bam"
-#CONT=$3
-#CONT="/home/asd2007/melnick_bcell_scratch/asd2007/ChipSeq/GCB_PolII/Sample_GCB_INPUT_C/Sample_GCB_INPUT_C/Sample_GCB_INPUT_C.tagAlign.gz"
-
-
 
 while [[ $# -gt 1 ]]
 do
     key="$1"
 
     case $key in
-        -f|--folder)
+        -f|--folderpath)
             FOLDERPATH="$2"
             shift # past argument
             ;;
@@ -42,11 +41,12 @@ do
             shift # past argument
             ;;
         -t|--trim)
-            TRIM=YES
+            TRIM="$2"
             shift # past argument
             ;;
-        --align)
-            BWA=1
+        -a|--aligner)
+            ALN="$2"
+            shift
             ;;
         *)
             # unknown option
@@ -57,14 +57,11 @@ done
 echo FOLDER PATH   = "${FOLDERPATH}"
 echo GENOME     = "${GENOME}"
 echo TRIM READS    = "${TRIM}"
-echo BWA ALN    = "${BWA}"
+echo ALINGER    = "${ALN}"
 if [[ -n $1 ]]; then
     echo "Last line of FILEPATH specified as non-opt/last argument:"
     tail -1 $1
 fi
-
-
-BT2LAN=0
 
 #set -e
 
@@ -74,7 +71,7 @@ BT2LAN=0
 #    . /pbtech_mounts/softlib001/apps/EL6/spack/share/spack/setup-env.sh
 #fi
 
-
+spack load bedtools2
 spack load bwa
 spack load bowtie2
 source /softlib/apps/EL6/R-v3.3.0/env
@@ -107,7 +104,14 @@ Sample=${Sample%%.*}
 rsync -r -v -a  $FOLDERPATH/$FILEPATH/*.gz ./
 #rsync -r -v -a -z $FOLDERPATH/$FILEPATH/*.sra ./
 rsync -r -v -a $FOLDERPATH/$FILEPATH/* ./
+
+## get linked input files
+
 #SRA=$(ls *.sra)
+
+
+## rsync symlinks for input file
+#rsync -L $FOLDERPATH/$FILEPATH/* ./ 
 
 mkdir -p ${Sample}
 
@@ -134,9 +138,9 @@ if [[ $GENOME == "hg19" ]] ; then
 	  REFbt2="${REFDIR}/Homo_sapiens/UCSC/hg19/Sequence/Bowtie2Index"
     BLACK="/athena/elementolab/scratch/asd2007/reference/hg19/wgEncodeDacMapabilityConsensusExcludable.bed"
     #BLACK="${REFDIR}/hg19/wgEncodeDacMapabilityConsensusExcludable.bed.gz"
-    #fetchChromSizes hg19 > hg19.chrom.sizes
-    chrsz="/athena/elementolab/scratch/asd2007/reference/hg19.chrom.sizes"
-    cp $chrsz $PWD/hg19.chrom.sizes
+    #fetchChromSizes hg19 >  ${chrsz}
+    chrsz="/athena/elementolab/scratch/asd2007/reference/ ${chrsz}"
+    cp $chrsz $PWD/ ${chrsz}
     RG="hg19"
     SPEC="hs"
     REFGen="/athena/elementolab/scratch/asd2007/reference/hg19/seq/male.hg19.fa"
@@ -151,7 +155,7 @@ elif [[ $GENOME == "hg38" ]] ; then
 	  REF="/athena/elementolab/scratch/asd2007/reference/hg38/bwa_index/GRCh38_no_alt_analysis_set_GCA_000001405.15.fasta"
 	  REFbt2="/athena/elementolab/scratch/asd2007/reference/hg38/bowtie2_index/GRCh38_no_alt_analysis_set_GCA_000001405.15.fasta"
 	  bwt2_idx="/athena/elementolab/scratch/asd2007/reference/hg38/bowtie2_index/GRCh38_no_alt_analysis_set_GCA_000001405.15.fasta"
-    #fetchChromSizes hg19 > hg19.chrom.sizes
+    #fetchChromSizes hg19 >  ${chrsz}
     RG="hg38"
     SPEC="hs"
     REFGen="/athena/elementolab/scratch/asd2007/reference/hg38/GRCh38_no_alt_analysis_set_GCA_000001405.15.fasta"
@@ -179,7 +183,7 @@ elif [[ $GENOME == "hg38_ENCODE" ]]; then
 	  REF="/athena/elementolab/scratch/asd2007/reference/hg38_ENCODE/bwa_index/GRCh38_no_alt_analysis_set_GCA_000001405.15.fasta"
 	  REFbt2="/athena/elementolab/scratch/asd2007/reference/hg38_ENCODE/bowtie2_index/GRCh38_no_alt_analysis_set_GCA_000001405.15.fasta"
     chrsz="/athena/elementolab/scratch/asd2007/reference/hg38_ENCODE/hg38_ENCODE.chrom.sizes"
-    #fetchChromSizes hg19 > hg19.chrom.sizes
+    #fetchChromSizes hg19 >  ${chrsz}
     RG="hg38"
     SPEC="hs"
     REFGen="/athena/elementolab/scratch/asd2007/reference/hg38/GRCh38_no_alt_analysis_set_GCA_000001405.15.fasta"
@@ -215,9 +219,9 @@ else
 	  REF="${REFDIR}/Homo_sapiens/UCSC/hg19/Sequence/BWAIndex"
 	  REFbt2="${REFDIR}/Homo_sapiens/UCSC/hg19/Sequence/Bowtie2Index"
     BLACK="${REFDIR}/hg19/wgEncodeDacMapabilityConsensusExcludable.bed.gz"
-    #fetchChromSizes hg19 > hg19.chrom.sizes
-    chrsz="/athena/elementolab/scratch/asd2007/reference/hg19.chrom.sizes"
-    cp $chrsz $PWD/hg19.chrom.sizes
+    #fetchChromSizes hg19 >  ${chrsz}
+    chrsz="/athena/elementolab/scratch/asd2007/reference/ ${chrsz}"
+    cp $chrsz $PWD/ ${chrsz}
     RG="hg19"
     SPEC="hs"
     REFGen="/athena/elementolab/scratch/asd2007/local/share/bcbio/genomes/Hsapiens/hg19/seq/hg19.fa"
@@ -233,7 +237,7 @@ echo "making fastq fromm SRA using fastq-dump.."
 
 if [ $RSAINPUT == 1 ]
 then
-    fastq-dump --gzip --skip-technical  --readids --dumpbase --split-FILEPATHs --clip *INPUT*.sra
+    fastq-dump --gzip --skip-technical  --readids --dumpbase --split-file --clip *INPUT*.sra
 fi
 #rm *INPUT*.sra
 
@@ -261,18 +265,19 @@ then
     #rm input from wd leaving only target
     rm ${TMPDIR}/*INPUT*.fastq.gz
     bwa mem -t ${NSLOTS} ${REF} $TMPDIR/INPUT/${Sample}.INPUT.fastq.gz | samtools view -bS - > $TMPDIR/${Sample}/${Sample}.INPUT.bam
-    sambamba sort --memory-limit 35GB \
+    sambamba sort --memory-limit 20GB \
              --nthreads ${NSLOTS} --tmpdir ${TMPDIR} --out $TMPDIR/${Sample}/${Sample}.INPUT.sorted.bam $TMPDIR/${Sample}/${Sample}.INPUT.bam
     samtools index $TMPDIR/${Sample}/${Sample}.INPUT.sorted.bam
     mkdir -p ${TMPDIR}/tmp
-    CONTA=$TMPDIR/${Sample}/${Sample}.INPUT.sorted.bam
-    picard MarkDuplicates REMOVE_DUPLICATES=true INPUT=$CONTA METRICS_FILE=$TMPDIR/${Sample}/Input.dedup.txt OUTPUT=${TMPDIR}/${Sample}/${Sample}.INPUT.sorted.nodup.bam VALIDATION_STRINGENCY=LENIENT ASSUME_SORTED=True
-    CONT=${TMPDIR}/${Sample}/${Sample}.INPUT.sorted.nodup.bam
+    CONT="$TMPDIR/${Sample}/${Sample}.INPUT.sorted.bam"
+   # picard MarkDuplicates REMOVE_DUPLICATES=true INPUT=$CONTA METRICS_FILE=$TMPDIR/${Sample}/Input.dedup.txt OUTPUT=${TMPDIR}/${Sample}/${Sample}.INPUT.sorted.nodup.bam VALIDATION_STRINGENCY=LENIENT ASSUME_SORTED=True
+   # CONT=${TMPDIR}/${Sample}/${Sample}.INPUT.sorted.nodup.bam
     samtools index $CONT
 fi
 
 
-#CONT="${TMPDIR}/${Sample}/${Sample}.INPUT.sorted.nodup.bam"
+CONT="$TMPDIR/${Sample}/${Sample}.INPUT.sorted.bam"
+#CONT="${TMPDIR}/${Sample}/${Sample}.INPUT.sorted.bam"
 
 ###########
 echo "----- FINISHED PROCESSING INPUT------"
@@ -291,25 +296,21 @@ echo "----------bowtie2 aligning-------------"
 #bowtie2 -p ${NSLOTS} --local -x ${TMPDIR}/bowtie2/hg19 -U $TMPDIR/R1/${Sample}.fq -S $TMPDIR/${Sample}/${Sample}.sam
 #bowtie2  --very-sensitive-local -p ${NSLOTS} -x $TMPDIR/Bowtie2Index/genome -U $TMPDIR/R1/${Sample}.fastq.gz -S $TMPDIR/${Sample}.sam
 
+##
+##if [ $BT2 == 1 ]
+##then
+##    bowtie2 --very-sensitive-local --threads ${NSLOTS} -x $TMPDIR/Bowtie2Index/genome \
+##        -U $TMPDIR/R1/${Sample}.fastq.gz  2> ${Sample}/${Sample}.align.log| \
+##        samtools view -bS - > $TMPDIR/${Sample}/${Sample}.bam
+##    sambamba sort --memory-limit 35GB \
+##             --nthreads ${NSLOTS} --tmpdir ${TMPDIR} --out $TMPDIR/${Sample}/${Sample}.sorted.bam $TMPDIR/${Sample}/${Sample}.bam
+##    samtools index $TMPDIR/${Sample}/${Sample}.sorted.bam
+##fi
+bwa mem -t ${NSLOTS} -M ${REF} $TMPDIR/R1/${Sample}.fastq.gz | samtools view -bS - > $TMPDIR/${Sample}/${Sample}.bam
 
-if [ $BT2 == 1 ]
-then
-    bowtie2 --very-sensitive-local --threads ${NSLOTS} -x $TMPDIR/Bowtie2Index/genome \
-        -U $TMPDIR/R1/${Sample}.fastq.gz  2> ${Sample}/${Sample}.align.log| \
-        samtools view -bS - > $TMPDIR/${Sample}/${Sample}.bam
-    sambamba sort --memory-limit 35GB \
+sambamba sort --memory-limit 20GB \
              --nthreads ${NSLOTS} --tmpdir ${TMPDIR} --out $TMPDIR/${Sample}/${Sample}.sorted.bam $TMPDIR/${Sample}/${Sample}.bam
     samtools index $TMPDIR/${Sample}/${Sample}.sorted.bam
-fi
-
-if [ $BWA == 1 ]
-then
-        bwa mem -t ${NSLOTS} ${REF} $TMPDIR/R1/${Sample}.fastq.gz | \
-        samtools view -bS - > $TMPDIR/${Sample}/${Sample}.bam
-    sambamba sort --memory-limit 35GB \
-             --nthreads ${NSLOTS} --tmpdir ${TMPDIR} --out $TMPDIR/${Sample}/${Sample}.sorted.bam $TMPDIR/${Sample}/${Sample}.bam
-    samtools index $TMPDIR/${Sample}/${Sample}.sorted.bam
-fi
 #bwa mem -t ${NSLOTS} ${REF}*.fa $TMPDIR/R1/${Sample}.fq > ${TMPDIR}/${Sample}/${Sample}.sam
 
 
@@ -338,8 +339,8 @@ samtools index $TMPDIR/${Sample}/${Sample}.sorted.nodup.bam
 
 echo "--------------------------Removing encode black listed intervals---------------------------"
 
-rmBlack.sh $CONT $BLACK
-CONT=$TMPDIR/${Sample}/${Sample}*INPUT*black.bam
+#rmBlack.sh $CONT $BLACK
+#CONT=$TMPDIR/${Sample}/${Sample}*INPUT*black.bam
 
 rmBlack.sh $TMPDIR/${Sample}/${Sample}.sorted.nodup.bam $BLACK
 
@@ -381,7 +382,7 @@ cp $TMPDIR/Input.tagAlign.gz $TMPDIR/${Sample}/${Sample}.Input.tagAlign.gz
 
 
 
-macs2 callpeak -t $TMPDIR/${Sample}/${Sample}.tagAlign.gz -c $TMPDIR/Input.tagAlign.gz -f BED -n $TMPDIR/${Sample}/${Sample}.narrow -g hs -p 1e-3 --keep-dup all --call-summits --to-large -B --SPMR
+macs2 callpeak -t $TMPDIR/${Sample}/${Sample}.tagAlign.gz -c $TMPDIR/Input.tagAlign.gz -f BED -n $TMPDIR/${Sample}/${Sample}.narrow -g hs -p 1e-5 --keep-dup all --call-summits --to-large -B --SPMR
 
 
 
@@ -391,8 +392,7 @@ macs2 callpeak -t $TMPDIR/${Sample}/${Sample}.tagAlign.gz -c $TMPDIR/Input.tagAl
 
 
 
-cp /athena/elementolab/scratch/asd2007/Reference/hg19.chrom.sizes ./
-#fetchChromSizes hg19 > hg19.chrom.sizes
+#fetchChromSizes hg19 >  ${chrsz}
 
 prefix=$TMPDIR/${Sample}/${Sample}.narrow
 
@@ -402,12 +402,12 @@ prefix=$TMPDIR/${Sample}/${Sample}.narrow
 macs2 bdgcmp -t ${prefix}_treat_pileup.bdg -c ${prefix}_control_lambda.bdg \
     --o-prefix ${prefix} -m FE
 
-slopBed -i ${prefix}_FE.bdg -g hg19.chrom.sizes -b 0 | bedClip stdin hg19.chrom.sizes ${prefix}_fc.bedgraph
+slopBed -i ${prefix}_FE.bdg -g ${chrsz} -b 0 | bedClip stdin  ${chrsz} ${prefix}_fc.bedgraph
 rm -f ${prefix}_FE.bdg
 
 sort -k1,1 -k2,2n ${prefix}_fc.bedgraph > ${prefix}_fc.srt.bedgraph
 
-bedGraphToBigWig  ${prefix}_fc.srt.bedgraph hg19.chrom.sizes ${prefix}_fc.bw
+bedGraphToBigWig  ${prefix}_fc.srt.bedgraph  ${chrsz} ${prefix}_fc.bw
 
 rm ${Sample}/*.bedgraph
 
@@ -449,11 +449,11 @@ echo "---------------------------------- Signal Tracks -------------------------
 
 
 bamCoverage --bam $TMPDIR/${Sample}/${Sample}.sorted.nodup.bam --binSize 5 \
-    --outFileFormat bigwig --smoothLength 250  \
+    --outFileFormat bigwig --smoothLength 300  \
     --normalizeUsingRPKM \
     --ignoreForNormalization chrX \
     -o $TMPDIR/${Sample}/${Sample}.rpkm.smooth.bw \
-    --centerReads --extendReads 125 --numberOfProcessors ${NSLOTS}
+    --centerReads --extendReads 150 --numberOfProcessors ${NSLOTS}
 
 
 

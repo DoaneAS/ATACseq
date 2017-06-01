@@ -24,6 +24,6 @@ bamToBed -i ${p1} | awk 'BEGIN{OFS="\t"} $6=="+" { $2=$2+4; $3=$3 ; $4="N" ; pri
 
 bedtools bamtobed -bedpe -mate1 -i ${p1} | gzip -c > ${o3}
 
-#shifted_tag    = "$prefix.tn5.tagAlign.gz"
+shifted_tag    = "$prefix.tn5.tagAlign.gz"
 
 #zcat ${o2} | awk -F $'\t' 'BEGIN {OFS = FS}{ if ($6 == "+") {$2 = $2 + 4} else if ($6 == "-") {$3 = $3 - 5} print $0 }' | gzip -c > ${o4}
